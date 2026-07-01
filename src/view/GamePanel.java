@@ -11,6 +11,7 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
     private boolean isPaused = false;
     private int score = 0;
     private int currentLevel = 1;
+    private java.util.ArrayList<model.Bullet> bullets = new java.util.ArrayList<>();
 
     public GamePanel() {
         setPreferredSize(new Dimension(800, 600));
@@ -35,6 +36,16 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
 
     private void updateGame() {
         plane.update();
+
+        for (int i = 0; i < bullets.size(); i++) {
+            model.Bullet b = bullets.get(i);
+            b.update();
+
+            if (!b.isActive()) {
+                bullets.remove(i);
+                i --;
+            }
+        }
     }
 
     @Override
@@ -46,6 +57,9 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
 
         // رسم هواپیما
         plane.draw(g2d);
+        for (model.Bullet b : bullets) {
+            b.draw(g2d);
+        }
 
         // رسم اطلاعات بازی (HUD)
         drawHUD(g2d);
@@ -104,6 +118,19 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
         }
         if (key == KeyEvent.VK_UP || key == KeyEvent.VK_W || key == KeyEvent.VK_DOWN || key == KeyEvent.VK_S) {
             plane.setDy(0);
+        }
+
+        if (key == KeyEvent.VK_SPACE) {
+            if (plane.canShoot()) {
+                // محاسبات برای شلیک دقیقاً از وسط و نوک سفینه
+                int bulletX = plane.getX() + (plane.getWidth() / 2);
+                int bulletY = plane.getY();
+
+                bullets.add(new model.Bullet(bulletX, bulletY));
+
+                // این لاگ آزمایشی قبلی را هم نگه می‌داریم
+                plane.shootMock();
+            }
         }
     }
 

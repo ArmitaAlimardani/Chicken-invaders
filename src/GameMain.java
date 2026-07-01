@@ -1,5 +1,5 @@
 import javax.swing.*;
-import view.GamePanel; // اصلاح آدرس ایمپورت بر اساس ساختار جدید پکیج‌ها
+import view.GamePanel;
 
 public class GameMain extends JFrame {
     public GameMain() {
@@ -7,11 +7,10 @@ public class GameMain extends JFrame {
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setResizable(false);
 
-        // اضافه کردن مستقیم پنل بازی جهت تست
         GamePanel gamePanel = new GamePanel();
         add(gamePanel);
 
-        pack(); // تنظیم اندازه فریم بر اساس PreferredSize پنل (۸۰۰x۶۰۰)
+        pack();
         setLocationRelativeTo(null);
     }
 
