@@ -125,4 +125,24 @@ public class Plane {
     public Rectangle getBounds() {
         return new Rectangle(x, y, width, height);
     }
+
+    public void applyPowerUp(PowerUpType type) {
+        switch (type) {
+            case ADD_FIRE:
+                incrementFireLevel();
+                break;
+            case RAPID_FIRE:
+                activatePremiumRapidFire(8); // ۸ ثانیه شلیک سریع طبق بند ۴.۶
+                break;
+            case EXTRA_LIFE:
+                addLife(); // سقف ۵ جان درون متد خودش هندل شده است
+                break;
+            case SHIELD:
+                activateShield(10); // ۱۰ ثانیه مصونیت طبق بند ۴.۶
+                break;
+            case FREEZE_BOMB:
+                // افکت این بمب محیطی است و مستقیماً در GamePanel مدیریت می‌شود.
+                break;
+        }
+    }
 }

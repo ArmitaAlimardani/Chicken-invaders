@@ -184,6 +184,57 @@ public class GridManager {
             }
         }
 
+        // 🛑 [بخش جدید: راه حل دوم] بررسی رسیدن کل گله به پایین صفحه
+        boolean networkReachedBottom = false;
+        for (int r = 0; r < 5; r++) {
+            for (int c = 0; c < 8; c++) {
+                Cell cell = grid[r][c];
+                // اگر سلول زنده است و موقعیت تارگت Y آن از حد مجاز (مثلاً 430 پیکسل) عبور کرده
+                if (cell != null && cell.getCellLives() > 0 && cell.getTargetY() > 430) {
+                    networkReachedBottom = true;
+                    break;
+                }
+            }
+        }
+
+        // اگر گله مرغ‌ها به کف صفحه نزدیک شد، کل ماتریس شبکه را به بالا ریست کن
+        if (networkReachedBottom) {
+            int startX = 80;
+            int startY = 50; // بازگشت به Y سقف
+            int hGap = 70;
+            int vGap = 65;
+            direction = 1; // ریست کردن جهت حرکت افقی به سمت راست
+
+            for (int r = 0; r < 5; r++) {
+                for (int c = 0; c < 8; c++) {
+                    Cell cell = grid[r][c];
+                    if (cell != null) {
+                        int targetNewX = startX + (c * hGap);
+                        int targetNewY = startY + (r * vGap);
+
+                        // محاسبه میزان جابه‌جایی لازم برای ریست فیزیکی سلول به مختصات اولیه بالا
+                        int diffX = targetNewX - cell.getTargetX();
+                        int diffY = targetNewY - cell.getTargetY();
+
+                        // انتقال هماهنگ سلول شبکه
+                        cell.updatePosition(diffX, diffY);
+
+                        // اگر مرغ زنده درون این سلول است، مختصات فیزیکی و تارگت مرغ را هم فورا بالا ببر
+                        Enemy enemy = cell.getCurrentEnemy();
+                        if (enemy != null) {
+                            enemy.x = targetNewX;
+                            enemy.y = targetNewY;
+                            if (enemy.isMovingToTarget) {
+                                enemy.setTargetPosition(targetNewX, targetNewY);
+                            }
+                        }
+                    }
+                }
+            }
+            System.out.println("⚠️ Warning: Chickens invaded the bottom! Grid reset to top.");
+            // جریمه کم شدن جان هواپیما به دلیل کپسوله‌سازی کامل در متد updateGame کلاس GamePanel مدیریت می‌شود.
+        }
+
         // شلیک تخم‌مرغ توسط مرغ‌ها در زمان مشخص شده
         long now = System.currentTimeMillis();
         if (now - lastEggDropTime > eggDropInterval) {
