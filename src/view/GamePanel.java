@@ -3,12 +3,10 @@ package view;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
-import java.io.File;
-import java.io.IOException;
-import javax.imageio.ImageIO;
 import model.Plane;
 import model.PowerUp;
 import model.PowerUpType;
+import model.enemy.Boss;
 import model.enemy.Enemy;
 
 public class GamePanel extends JPanel implements ActionListener, KeyListener {
@@ -24,10 +22,13 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
     private java.util.ArrayList<Enemy> enemies = new java.util.ArrayList<>();
     private java.util.ArrayList<model.Egg> eggs = new java.util.ArrayList<>();
 
-    // لیست نگهداری پاورآپ‌های فعال در صفحه (بند ۴.۶)
+    // لیست نگهداری پاورآپ‌های فعال در صفحه
     private java.util.ArrayList<PowerUp> powerUps = new java.util.ArrayList<>();
 
     private model.GridManager gridManager;
+
+    // لیست نگهداری افکت‌های انفجار فعال در صفحه (بند ۴.۷)
+    private java.util.ArrayList<model.Explosion> explosions = new java.util.ArrayList<>();
 
     // متغیرهای مدیریت پاورآپ بمب یخ‌زن
     private boolean isFrozen = false;
@@ -77,6 +78,13 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
         // ۱. آپدیت شبکهٔ مرغ‌ها و غول‌ها (فقط در صورت عدم یخ‌زدگی)
         if (!isFrozen) {
             gridManager.update();
+
+            //  فعال‌سازی شلیک غول‌ها: اگر در لیست دشمنان، غولی وجود دارد باید حمله کند
+            for (Enemy enemy : enemies) {
+                if (enemy instanceof Boss) {
+                    ((Boss) enemy).updateAttack(eggs);
+                }
+            }
         }
 
         this.currentLevel = gridManager.getCurrentLevel();
@@ -97,13 +105,13 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
                 Enemy enemy = enemies.get(i);
                 enemy.update();
 
-                // اگر مرغ زنده انفرادی یا سیستمی به پایین صفحه (مثلاً 500) نفوذ کرد
                 if (enemy.y > 500) {
-                    // جریمه: اگر سپر فعال نباشد، یک جان کم می‌شود
                     if (!plane.isShieldActive()) {
                         plane.setLives(plane.getLives() - 1);
+                        //  اضافه شدن انفجار در محل فضاپیما به دلیل نفوذ مرغ به انتهای صفحه
+                        explosions.add(new model.Explosion(plane.getX() + (plane.getWidth() / 2), plane.getY() + (plane.getHeight() / 2), Color.ORANGE
+                        ));
                     }
-                    // مختصات این مرغ خاطی را موقتاً بالا می‌بریم تا متد ریست تیمی GridManager کل گله را یکپارچه کند
                     enemy.y = 100;
                 }
 
@@ -136,7 +144,7 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
             }
         }
 
-        // ۶. سیستم برخورد تیرهای هواپیما به مرغ‌ها + شانس سقوط ۲۰٪ پاورآپ
+        // ۶. سیستم برخورد تیرهای هواپیما به مرغ‌ها + شانس سقوط پاورآپ + ایجاد انفجار
         for (int i = 0; i < bullets.size(); i++) {
             model.Bullet b = bullets.get(i);
             for (int j = 0; j < enemies.size(); j++) {
@@ -151,7 +159,15 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
                         score += 10;
                         gridManager.handleEnemyDeath(enemy);
 
-                        // شانس ۲۰ درصدی سقوط پاورآپ در لول‌های معمولی (نه غول‌ها)
+                        // 💥 اصلاح خطا: استفاده از getBounds().width و getBounds().height برای پیدا کردن مرکز
+                        Color expColor = (enemy instanceof model.enemy.Boss) ? Color.ORANGE : Color.RED;
+                        explosions.add(new model.Explosion(
+                                enemy.getX() + (enemy.getBounds().width / 2),
+                                enemy.getY() + (enemy.getBounds().height / 2),
+                                expColor
+                        ));
+
+                        // شانس ۲۰ درصدی سقوط پاورآپ در لول‌های معمولی
                         if (currentLevel != 4 && currentLevel != 8 && Math.random() < 0.20) {
                             PowerUpType[] types = PowerUpType.values();
                             PowerUpType randomType = types[(int) (Math.random() * types.length)];
@@ -166,16 +182,22 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
             }
         }
 
-        // ۷. سیستم برخورد تخم‌مرغ‌ها به هواپیما (با بررسی وضعیت شیلد)
+        // ۷. سیستم برخورد تخم‌مرغ‌ها به هواپیما (با اعمال افکت انفجار فضاپیما هنگام خسارت)
         for (int i = 0; i < eggs.size(); i++) {
             model.Egg egg = eggs.get(i);
             if (egg.getBounds().intersects(plane.getBounds())) {
                 eggs.remove(i);
                 i--;
 
-                // اگر سپر فعال نباشد، هواپیما جان از دست می‌دهد
                 if (!plane.isShieldActive()) {
                     plane.setLives(plane.getLives() - 1);
+
+                    // 💥 ایجاد افکت انفجار در مرکز فضاپیما به دلیل از دست دادن جان (بند ۴.۷)
+                    explosions.add(new model.Explosion(
+                            plane.getX() + (plane.getWidth() / 2),
+                            plane.getY() + (plane.getHeight() / 2),
+                            Color.YELLOW
+                    ));
                 }
             }
         }
@@ -184,17 +206,24 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
         for (int i = 0; i < powerUps.size(); i++) {
             PowerUp p = powerUps.get(i);
             if (p.getBounds().intersects(plane.getBounds())) {
-
-                // اعمال پاورآپ روی مدل Plane
                 plane.applyPowerUp(p.getType());
 
-                // هندل کردن اثر محیطی بمب یخ‌زن در پنل
                 if (p.getType() == PowerUpType.FREEZE_BOMB) {
                     isFrozen = true;
-                    freezeEndTime = System.currentTimeMillis() + 3000; // ۳ ثانیه یخ‌زدگی
+                    freezeEndTime = System.currentTimeMillis() + 3000;
                 }
 
                 powerUps.remove(i);
+                i--;
+            }
+        }
+
+        // ۹. آپدیت منطقی افکت‌های انفجار و حذف افکت‌های پایان یافته از حافظه
+        for (int i = 0; i < explosions.size(); i++) {
+            model.Explosion exp = explosions.get(i);
+            exp.update();
+            if (!exp.isActive()) {
+                explosions.remove(i);
                 i--;
             }
         }
@@ -213,6 +242,11 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
         } else {
             g2d.setColor(Color.BLACK);
             g2d.fillRect(0, 0, 800, 600);
+        }
+
+        // 💥 رسم افکت‌های بصری انفجار (قبل از هواپیما و المان‌ها رندر می‌شود تا روی پس‌زمینه بنشیند)
+        for (model.Explosion exp : explosions) {
+            exp.draw(g2d);
         }
 
         // رسم هواپیما
@@ -243,7 +277,7 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
 
         // افکت بصری یخ‌زدگی محیطی
         if (isFrozen) {
-            g2d.setColor(new Color(0, 191, 255, 35)); // لایه آبی شفاف یخی
+            g2d.setColor(new Color(0, 191, 255, 35));
             g2d.fillRect(0, 0, 800, 600);
             g2d.setColor(Color.CYAN);
             g2d.setFont(new Font("Arial", Font.BOLD, 18));
@@ -306,15 +340,12 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
                 int bulletY = plane.getY();
                 int fireLevel = plane.getFireLevel();
 
-                // مدیریت شلیک چندگانه موازی/بادبزنی بر اساس لول شلیک (بند ۴.۶)
                 if (fireLevel == 1) {
                     bullets.add(new model.Bullet(bulletX, bulletY));
                 } else if (fireLevel == 2) {
-                    // دو تیر موازی
                     bullets.add(new model.Bullet(bulletX - 15, bulletY));
                     bullets.add(new model.Bullet(bulletX + 15, bulletY));
                 } else {
-                    // لول ۳ و بالاتر: سه تیر همزمان عریض
                     bullets.add(new model.Bullet(bulletX, bulletY));
                     bullets.add(new model.Bullet(bulletX - 25, bulletY));
                     bullets.add(new model.Bullet(bulletX + 25, bulletY));

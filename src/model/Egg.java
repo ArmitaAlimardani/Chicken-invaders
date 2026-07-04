@@ -5,8 +5,8 @@ import javax.swing.*;
 
 public class Egg {
     private int x, y;
-    private int width = 18;
-    private int height = 22;
+    private int width = 25;
+    private int height = 30;
     private double speed;
     private double angle; // به رادیان برای شلیک‌های چند جهته غول‌ها
     private boolean active = true;
