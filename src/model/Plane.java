@@ -6,8 +6,8 @@ import java.awt.*;
 
 public class Plane {
     private int x, y;
-    private int width = 200;
-    private int height = 200;
+    private int width = 150;
+    private int height = 150;
     private int speed = 5;
     private int dx, dy;
 
@@ -32,6 +32,8 @@ public class Plane {
         this.planeImage = this.planeImage.getScaledInstance(width, height, Image.SCALE_SMOOTH);
 
     }
+
+    public void setLives(int lives) { this.lives = lives; }
 
     public void update() {
         x += dx;

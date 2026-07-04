@@ -3,7 +3,7 @@ package model.enemy;
 import java.awt.*;
 
 public abstract class Enemy {
-    protected int x, y;
+    public int x, y;
     protected int width = 90;
     protected int height = 90;
     protected int speedX, speedY;
@@ -11,7 +11,7 @@ public abstract class Enemy {
     protected boolean active = true;
 
     protected int targetX, targetY;
-    protected boolean isMovingToTarget = false;
+    public boolean isMovingToTarget = false;
 
     public Enemy(int x, int y, int speedX, int speedY, int lives) {
         this.x = x;

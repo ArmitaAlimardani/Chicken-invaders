@@ -4,11 +4,11 @@ import javax.swing.*;
 import java.awt.*;
 
 public class ShooterEnemy extends Enemy {
-    private int direction = 1;
     private Image enemyImage;
 
     public ShooterEnemy(int x, int y, int currentLevel) {
-        super(x, y, 2, 2, (currentLevel <= 3) ? 2 : 3);
+        // تنظیم جان بر اساس جدول مرحله (لول ۵ و ۶: ۳ جان، لول ۷: ۴ جان)
+        super(x, y, 2, 2, (currentLevel >= 7) ? 4 : 3);
 
         ImageIcon icon = new ImageIcon("icon\\shooter_chicken.png");
         Image rawImage = icon.getImage();
@@ -19,15 +19,13 @@ public class ShooterEnemy extends Enemy {
 
     @Override
     public void update() {
+        // اگر مرغ جایگزین است و دارد به سمت خانه اصلی‌اش در شبکه پرواز می‌کند
         if (isMovingToTarget) {
-            moveTowardsTarget();
-            return;
+            moveTowardsTarget(); // فراخوانی متد پرواز از کلاس پدر (Enemy)
         }
-        x += speedX * direction;
-        if (x < 0 || x > 800 - width) {
-            direction *= -1;
-            y += 10;
-        }
+
+        // توجه: حرکت افقی و عمودی تیمی شبکه در مراحل ۵، ۶ و ۷
+        // به صورت متمرکز در متد update کلاس GridManager مدیریت می‌شود.
     }
 
     @Override
@@ -39,6 +37,7 @@ public class ShooterEnemy extends Enemy {
             g2d.fillOval(x, y, width, height);
         }
 
+        // رسم تعداد جان‌های باقی‌مانده بالای سر مرغ
         g2d.setColor(Color.WHITE);
         g2d.setFont(new Font("Arial", Font.BOLD, 12));
         g2d.drawString(String.valueOf(lives), x + width/2 - 4, y - 5);
