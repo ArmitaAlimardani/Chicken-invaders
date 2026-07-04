@@ -3,7 +3,12 @@ package view;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.io.File;
+import java.io.IOException;
+import javax.imageio.ImageIO;
 import model.Plane;
+import model.PowerUp;
+import model.PowerUpType;
 import model.enemy.Enemy;
 
 public class GamePanel extends JPanel implements ActionListener, KeyListener {
@@ -13,10 +18,20 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
     private int score = 0;
     private int currentLevel = 1;
 
+    private Image backgroundImage;
+
     private java.util.ArrayList<model.Bullet> bullets = new java.util.ArrayList<>();
     private java.util.ArrayList<Enemy> enemies = new java.util.ArrayList<>();
     private java.util.ArrayList<model.Egg> eggs = new java.util.ArrayList<>();
+
+    // لیست نگهداری پاورآپ‌های فعال در صفحه (بند ۴.۶)
+    private java.util.ArrayList<PowerUp> powerUps = new java.util.ArrayList<>();
+
     private model.GridManager gridManager;
+
+    // متغیرهای مدیریت پاورآپ بمب یخ‌زن
+    private boolean isFrozen = false;
+    private long freezeEndTime = 0;
 
     public GamePanel() {
         setPreferredSize(new Dimension(800, 600));
@@ -24,9 +39,13 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
         setFocusable(true);
         addKeyListener(this);
 
-        plane = new Plane(362, 480);
+        // بارگذاری تصویر پس‌زمینه جدید
+        ImageIcon bgIcon = new ImageIcon("icon\\background.jpg");
+        if (bgIcon.getImageLoadStatus() == MediaTracker.COMPLETE) {
+            this.backgroundImage = bgIcon.getImage().getScaledInstance(800, 600, Image.SCALE_SMOOTH);
+        }
 
-        // مقداردهی اولیه مدیریت شبکه و مراحل
+        plane = new Plane(362, 480);
         gridManager = new model.GridManager(currentLevel, enemies, eggs);
 
         gameTimer = new Timer(16, this);
@@ -42,7 +61,6 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
     }
 
     private void updateGame() {
-        // اگر جان هواپیما صفر شده باشد، بازی تمام است (Game Over)
         if (plane.getLives() <= 0) {
             gameTimer.stop();
             return;
@@ -50,10 +68,17 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
 
         plane.update();
 
-        // ۱. آپدیت هماهنگ و تیمی شبکهٔ مرغ‌ها و غول‌ها
-        gridManager.update();
+        // چک کردن اتمام زمان بمب یخ‌زن
+        long now = System.currentTimeMillis();
+        if (isFrozen && now > freezeEndTime) {
+            isFrozen = false;
+        }
 
-        // همگام‌سازی لول پنل گرافیکی با موتور بازی
+        // ۱. آپدیت شبکهٔ مرغ‌ها و غول‌ها (فقط در صورت عدم یخ‌زدگی)
+        if (!isFrozen) {
+            gridManager.update();
+        }
+
         this.currentLevel = gridManager.getCurrentLevel();
 
         // ۲. آپدیت گلوله‌های هواپیما
@@ -66,27 +91,52 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
             }
         }
 
-        // ۳. آپدیت وضعیت تک‌تک مرغ‌ها (مانند حرکت و پرواز جایگزین‌ها)
-        for (int i = 0; i < enemies.size(); i++) {
-            Enemy enemy = enemies.get(i);
-            enemy.update();
-            if (!enemy.isActive()) {
-                enemies.remove(i);
+        // ۳. آپدیت وضعیت تک‌تک مرغ‌ها
+        if (!isFrozen) {
+            for (int i = 0; i < enemies.size(); i++) {
+                Enemy enemy = enemies.get(i);
+                enemy.update();
+
+                // اگر مرغ زنده انفرادی یا سیستمی به پایین صفحه (مثلاً 500) نفوذ کرد
+                if (enemy.y > 500) {
+                    // جریمه: اگر سپر فعال نباشد، یک جان کم می‌شود
+                    if (!plane.isShieldActive()) {
+                        plane.setLives(plane.getLives() - 1);
+                    }
+                    // مختصات این مرغ خاطی را موقتاً بالا می‌بریم تا متد ریست تیمی GridManager کل گله را یکپارچه کند
+                    enemy.y = 100;
+                }
+
+                if (!enemy.isActive()) {
+                    enemies.remove(i);
+                    i--;
+                }
+            }
+        }
+
+        // ۴. آپدیت تخم‌مرغ‌ها و گلوله‌های دشمن (متوقف در زمان یخ‌زدگی)
+        if (!isFrozen) {
+            for (int i = 0; i < eggs.size(); i++) {
+                model.Egg egg = eggs.get(i);
+                egg.update();
+                if (!egg.isActive()) {
+                    eggs.remove(i);
+                    i--;
+                }
+            }
+        }
+
+        // ۵. آپدیت پاورآپ‌های در حال سقوط
+        for (int i = 0; i < powerUps.size(); i++) {
+            PowerUp p = powerUps.get(i);
+            p.update();
+            if (!p.isActive()) {
+                powerUps.remove(i);
                 i--;
             }
         }
 
-        // ۴. آپدیت تخم‌مرغ‌ها و گلوله‌های دشمن
-        for (int i = 0; i < eggs.size(); i++) {
-            model.Egg egg = eggs.get(i);
-            egg.update();
-            if (!egg.isActive()) {
-                eggs.remove(i);
-                i--;
-            }
-        }
-
-        // ۵. سیستم برخورد تیرهای هواپیما به مرغ‌ها و غول‌ها
+        // ۶. سیستم برخورد تیرهای هواپیما به مرغ‌ها + شانس سقوط ۲۰٪ پاورآپ
         for (int i = 0; i < bullets.size(); i++) {
             model.Bullet b = bullets.get(i);
             for (int j = 0; j < enemies.size(); j++) {
@@ -101,7 +151,13 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
                         score += 10;
                         gridManager.handleEnemyDeath(enemy);
 
-                        // حذف فیزیکی دشمن از لیست پنل برای فعال شدن چرخه تغییر لول
+                        // شانس ۲۰ درصدی سقوط پاورآپ در لول‌های معمولی (نه غول‌ها)
+                        if (currentLevel != 4 && currentLevel != 8 && Math.random() < 0.20) {
+                            PowerUpType[] types = PowerUpType.values();
+                            PowerUpType randomType = types[(int) (Math.random() * types.length)];
+                            powerUps.add(new PowerUp(enemy.getX(), enemy.getY(), randomType));
+                        }
+
                         enemies.remove(j);
                         j--;
                     }
@@ -110,15 +166,36 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
             }
         }
 
-        // ۶. سیستم برخورد تخم‌مرغ‌ها/تیرهای دشمن به هواپیما (بند ۴.۵)
+        // ۷. سیستم برخورد تخم‌مرغ‌ها به هواپیما (با بررسی وضعیت شیلد)
         for (int i = 0; i < eggs.size(); i++) {
             model.Egg egg = eggs.get(i);
             if (egg.getBounds().intersects(plane.getBounds())) {
                 eggs.remove(i);
                 i--;
 
-                // کم شدن یک جان از هواپیما (سیستم سپر بعداً اضافه می‌شود)
-                plane.setLives(plane.getLives() - 1);
+                // اگر سپر فعال نباشد، هواپیما جان از دست می‌دهد
+                if (!plane.isShieldActive()) {
+                    plane.setLives(plane.getLives() - 1);
+                }
+            }
+        }
+
+        // ۸. سیستم برخورد هواپیما با پاورآپ‌ها و جذب آن‌ها
+        for (int i = 0; i < powerUps.size(); i++) {
+            PowerUp p = powerUps.get(i);
+            if (p.getBounds().intersects(plane.getBounds())) {
+
+                // اعمال پاورآپ روی مدل Plane
+                plane.applyPowerUp(p.getType());
+
+                // هندل کردن اثر محیطی بمب یخ‌زن در پنل
+                if (p.getType() == PowerUpType.FREEZE_BOMB) {
+                    isFrozen = true;
+                    freezeEndTime = System.currentTimeMillis() + 3000; // ۳ ثانیه یخ‌زدگی
+                }
+
+                powerUps.remove(i);
+                i--;
             }
         }
     }
@@ -129,6 +206,14 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
         Graphics2D g2d = (Graphics2D) g;
 
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        // 🌌 رسم تصویر پس‌زمینه کهکشانی
+        if (backgroundImage != null) {
+            g2d.drawImage(backgroundImage, 0, 0, null);
+        } else {
+            g2d.setColor(Color.BLACK);
+            g2d.fillRect(0, 0, 800, 600);
+        }
 
         // رسم هواپیما
         plane.draw(g2d);
@@ -148,8 +233,22 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
             egg.draw(g2d);
         }
 
+        // رسم پاورآپ‌های در حال سقوط
+        for (PowerUp p : powerUps) {
+            p.draw(g2d);
+        }
+
         // رسم اطلاعات بازی (HUD)
         drawHUD(g2d);
+
+        // افکت بصری یخ‌زدگی محیطی
+        if (isFrozen) {
+            g2d.setColor(new Color(0, 191, 255, 35)); // لایه آبی شفاف یخی
+            g2d.fillRect(0, 0, 800, 600);
+            g2d.setColor(Color.CYAN);
+            g2d.setFont(new Font("Arial", Font.BOLD, 18));
+            g2d.drawString("❄️ ENEMIES FROZEN ❄️", 310, 35);
+        }
 
         // صفحه توقف بازی (PAUSED)
         if (isPaused) {
@@ -160,19 +259,19 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
             g2d.drawString("PAUSED", 330, 300);
         }
 
-        // صفحه باخت نهایی (Game Over) - بند ۴.۳
+        // صفحه باخت نهایی (Game Over)
         if (plane.getLives() <= 0) {
-            g2d.setColor(new Color(150, 0, 0, 180)); // قرمز ملایم
+            g2d.setColor(new Color(150, 0, 0, 180));
             g2d.fillRect(0, 0, 800, 600);
             g2d.setColor(Color.WHITE);
             g2d.setFont(new Font("Arial", Font.BOLD, 48));
             g2d.drawString("GAME OVER", 260, 300);
         }
 
-        // صفحه پیروزی نهایی بازی (Victory) - بند ۴.۴
+        // صفحه پیروزی نهایی بازی (Victory)
         if (currentLevel == 8 && enemies.isEmpty()) {
             gameTimer.stop();
-            g2d.setColor(new Color(0, 150, 0, 180)); // سبز ملایم
+            g2d.setColor(new Color(0, 150, 0, 180));
             g2d.fillRect(0, 0, 800, 600);
             g2d.setColor(Color.WHITE);
             g2d.setFont(new Font("Arial", Font.BOLD, 48));
@@ -199,14 +298,27 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
         if (key == KeyEvent.VK_LEFT || key == KeyEvent.VK_A) plane.setDx(-plane.getSpeed());
         if (key == KeyEvent.VK_RIGHT || key == KeyEvent.VK_D) plane.setDx(plane.getSpeed());
         if (key == KeyEvent.VK_UP || key == KeyEvent.VK_W) plane.setDy(-plane.getSpeed());
-        if (key == KeyEvent.VK_DOWN || key == KeyEvent.VK_S) plane.setDx(0);
         if (key == KeyEvent.VK_DOWN || key == KeyEvent.VK_S) plane.setDy(plane.getSpeed());
 
         if (key == KeyEvent.VK_SPACE) {
             if (plane.canShoot()) {
                 int bulletX = plane.getX() + (plane.getWidth() / 2);
                 int bulletY = plane.getY();
-                bullets.add(new model.Bullet(bulletX, bulletY));
+                int fireLevel = plane.getFireLevel();
+
+                // مدیریت شلیک چندگانه موازی/بادبزنی بر اساس لول شلیک (بند ۴.۶)
+                if (fireLevel == 1) {
+                    bullets.add(new model.Bullet(bulletX, bulletY));
+                } else if (fireLevel == 2) {
+                    // دو تیر موازی
+                    bullets.add(new model.Bullet(bulletX - 15, bulletY));
+                    bullets.add(new model.Bullet(bulletX + 15, bulletY));
+                } else {
+                    // لول ۳ و بالاتر: سه تیر همزمان عریض
+                    bullets.add(new model.Bullet(bulletX, bulletY));
+                    bullets.add(new model.Bullet(bulletX - 25, bulletY));
+                    bullets.add(new model.Bullet(bulletX + 25, bulletY));
+                }
                 plane.shootMock();
             }
         }
