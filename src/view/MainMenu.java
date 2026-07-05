@@ -58,22 +58,26 @@ public class MainMenu extends JFrame {
         // ---- پیاده‌سازی اکشن دکمه‌ها ----
 
         // ۱. دکمه شروع بازی جدید (New Game)
-        btnNewGame.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                if (!UserSession.isLoggedIn()) {
-                    JOptionPane.showMessageDialog(MainMenu.this, "ابتدا باید وارد حساب کاربری خود شوید یا ثبت‌نام کنید.");
-                    // 👈 اینجا بعداً فرم ورود/ثبت‌نام را باز می‌کنیم
-                    openLoginRegisterDialog();
-                } else {
-                    // کاربر وارد شده، بازی اصلی را استارت می‌زنیم
-                    startGame();
-                }
+        btnNewGame.addActionListener(e -> {
+            // اگر کاربر قبلاً لاگین کرده، مستقیم بازی شروع شود
+            if (model.database.UserSession.isLoggedIn()) {
+                startGame();
+            } else {
+                // در غیر این صورت، فرم ورود/ثبت‌نام باز شود
+                openLoginRegisterDialog();
             }
         });
 
-        // ۲. جدول بالاترین امتیازها (High Scores)
-        btnHighScores.addActionListener(e -> showHighScoresDialog());
+        // ۲. جدول بالاترین امتیازها (High Scores) - در کلاس MainMenu
+        btnHighScores.addActionListener(e -> {
+            // ساخت پنل امتیازات و پاس دادن خودِ منو (this) و پنل اصلی منو (mainPanel)
+            HighScorePanel highScorePanel = new HighScorePanel(this, mainPanel);
+
+            this.getContentPane().removeAll();
+            this.add(highScorePanel);
+            this.revalidate();
+            this.repaint();
+        });
 
         // ۳. تنظیمات صدا (Settings)
         btnSettings.addActionListener(e -> showSettingsDialog());
@@ -102,51 +106,16 @@ public class MainMenu extends JFrame {
         return button;
     }
 
-    // متد موقت برای باز کردن فرم لاگین
     private void openLoginRegisterDialog() {
-        // گرفتن نام کاربری
-        String user = JOptionPane.showInputDialog(this, "نام کاربری:");
-        if (user == null || user.trim().isEmpty()) return;
+        AuthDialog authDlg = new AuthDialog(this);
+        authDlg.setVisible(true);
 
-        // گرفتن رمز عبور
-        String pass = JOptionPane.showInputDialog(this, "رمز عبور:");
-        if (pass == null || pass.trim().isEmpty()) return;
-
-        user = user.trim();
-        pass = pass.trim();
-
-        // تلاش برای ثبت‌نام (اگر کاربر از قبل نباشد، ثبت‌نام می‌شود)
-        DatabaseManager.registerUser(user, pass);
-
-        // بررسی ورود
-        boolean loggedIn = DatabaseManager.loginUser(user, pass);
-
-        if (loggedIn) {
-            UserSession.setUsername(user);
-            JOptionPane.showMessageDialog(this, "ورود موفقیت‌آمیز بود! خوش آمدید " + user);
-
-            // 🚀 شلیک نهایی: اجرای بازی بلافاصله بعد از تایید پیام لاگین
+        // اگر لاگین در LoginPanel موفق بود، بازی استارت می‌خورد
+        if (authDlg.isLoginSucceeded()) {
             startGame();
-        } else {
-            JOptionPane.showMessageDialog(this, "خطا در ورود یا اطلاعات نادرست است!");
         }
     }
 
-    // نمایش جدول امتیازات
-    private void showHighScoresDialog() {
-        ArrayList<String[]> scores = DatabaseManager.getHighScores();
-        StringBuilder sb = new StringBuilder("🏆 Top High Scores 🏆\n\n");
-        sb.append(String.format("%-15s %-10s %-10s %-20s\n", "User", "Score", "Level", "Date"));
-        sb.append("-------------------------------------------------------------\n");
-        for (String[] row : scores) {
-            sb.append(String.format("%-15s %-10s %-10s %-20s\n", row[0], row[1], row[2], row[3]));
-        }
-
-        JTextArea textArea = new JTextArea(sb.toString());
-        textArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
-        textArea.setEditable(false);
-        JOptionPane.showMessageDialog(this, new JScrollPane(textArea), "High Scores", JOptionPane.PLAIN_MESSAGE);
-    }
 
     // پنجره تنظیمات صدا
     private void showSettingsDialog() {

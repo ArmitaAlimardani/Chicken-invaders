@@ -144,9 +144,11 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
 
             //  ذخیره رکورد در صورت باخت
             if (!scoreSaved && UserSession.isLoggedIn()) {
-                DatabaseManager.saveGameRecord(UserSession.getUsername(), score, currentLevel, "Default Settings");
+                // ارسال مستقیم مقدار لول از گرید منیجر برای دقت ۱۰۰٪
+                int finalLvl = gridManager.getCurrentLevel();
+                DatabaseManager.saveGameRecord(UserSession.getUsername(), score, finalLvl, "ON");
                 scoreSaved = true;
-                System.out.println("Game Over record saved into database!");
+                System.out.println(" Game Over record saved into database!");
             }
             return;
         }
@@ -229,8 +231,7 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
         }
 
         // ۶. سیستم برخورد تیرهای هواپیما به مرغ‌ها / غول‌ها (تفکیک منطق غول از مرغ‌ها)
-
-        //  حالت اول: مدیریت اختصاصی غول (مرحله ۴ و ۸)
+        //  مدیریت اختصاصی غول (مرحله ۴ و ۸)
         if (currentLevel == 4 || currentLevel == 8) {
             if (!enemies.isEmpty()) {
                 Enemy boss = enemies.get(0);
@@ -256,20 +257,21 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
 
                                 enemies.remove(boss);
 
-                                // 🚀 شلیک به باگ: اگر لول ۸ بودیم، یعنی بازی تمام شده و مستقیماً وارد فاز پیروزی می‌شویم
+                                // 🚀 اصلاح این بخش: اگر لول ۸ بود، رکورد پیروزی ثبت شود
                                 if (currentLevel == 8) {
                                     gameTimer.stop();
                                     isVictory = true;
 
+                                    // ذخیره در دیتابیس
                                     if (!scoreSaved && UserSession.isLoggedIn()) {
-                                        DatabaseManager.saveGameRecord(UserSession.getUsername(), score, currentLevel, "Default Settings");
+                                        DatabaseManager.saveGameRecord(UserSession.getUsername(), score, 8, "ON");
                                         scoreSaved = true;
                                         System.out.println("🏆 Victory record saved into database!");
                                     }
-                                    return; // خروج فوری از متد آپدیت چون بازی به پایان رسیده است
+                                    return;
                                 }
 
-                                // اگر لول ۴ بود، روال عادی تغییر لول به ۵ انجام می‌شود:
+                                // روال عادی لول ۴
                                 gridManager.handleEnemyDeath(boss);
                                 this.currentLevel = gridManager.getCurrentLevel();
                                 return;
