@@ -9,12 +9,20 @@ import model.PowerUpType;
 import model.enemy.Boss;
 import model.enemy.Enemy;
 
+import model.database.DatabaseManager;
+import model.database.UserSession;
+
 public class GamePanel extends JPanel implements ActionListener, KeyListener {
     private Timer gameTimer;
     private Plane plane;
     private boolean isPaused = false;
     private int score = 0;
     private int currentLevel = 1;
+    private boolean scoreSaved = false;
+
+    private boolean isVictory = false;
+
+    private MainMenu mainMenu;
 
     private Image backgroundImage;
 
@@ -34,13 +42,34 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
     private boolean isFrozen = false;
     private long freezeEndTime = 0;
 
-    public GamePanel() {
+//    public GamePanel() {
+//        setPreferredSize(new Dimension(800, 600));
+//        setBackground(Color.BLACK);
+//        setFocusable(true);
+//        addKeyListener(this);
+//
+//        // بارگذاری تصویر پس‌زمینه جدید
+//        ImageIcon bgIcon = new ImageIcon("icon\\background.jpg");
+//        if (bgIcon.getImageLoadStatus() == MediaTracker.COMPLETE) {
+//            this.backgroundImage = bgIcon.getImage().getScaledInstance(800, 600, Image.SCALE_SMOOTH);
+//        }
+//
+//        plane = new Plane(362, 480);
+//        gridManager = new model.GridManager(currentLevel, enemies, eggs);
+//
+//        gameTimer = new Timer(16, this);
+//        gameTimer.start();
+//    }
+
+    //  تغییر ورودی سازنده برای اتصال منوی اصلی
+    public GamePanel(MainMenu mainMenu) {
+        this.mainMenu = mainMenu;
+
         setPreferredSize(new Dimension(800, 600));
         setBackground(Color.BLACK);
         setFocusable(true);
         addKeyListener(this);
 
-        // بارگذاری تصویر پس‌زمینه جدید
         ImageIcon bgIcon = new ImageIcon("icon\\background.jpg");
         if (bgIcon.getImageLoadStatus() == MediaTracker.COMPLETE) {
             this.backgroundImage = bgIcon.getImage().getScaledInstance(800, 600, Image.SCALE_SMOOTH);
@@ -51,6 +80,54 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
 
         gameTimer = new Timer(16, this);
         gameTimer.start();
+
+        //  سیستم هوشمند KeyBinding برای بازگشت قطعی به منوی اصلی با کلید Enter
+        this.getInputMap(javax.swing.JComponent.WHEN_IN_FOCUSED_WINDOW)
+                .put(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ENTER, 0), "returnToMenu");
+
+        this.getActionMap().put("returnToMenu", new javax.swing.AbstractAction() {
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent e) {
+                if (isVictory) { // اگر پرچم پیروزی فعال شده بود
+                    Window topFrame = SwingUtilities.getWindowAncestor(GamePanel.this);
+                    if (topFrame != null) {
+                        topFrame.dispose(); // بستن پنجره بازی
+                    }
+                    if (GamePanel.this.mainMenu != null) {
+                        GamePanel.this.mainMenu.setVisible(true); // نمایش مجدد همان منوی اصلی
+                    }
+                }
+            }
+        });
+
+
+        //  سیستم هوشمند KeyBinding برای بازگشت به منوی اصلی پس از Game Over (کلید ESC)
+        this.getInputMap(javax.swing.JComponent.WHEN_IN_FOCUSED_WINDOW)
+                .put(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ESCAPE, 0), "returnToMenuOnGameOver");
+
+        // اختیاری: فعال کردن کلید ENTER برای حالت باخت علاوه بر ESC
+        this.getInputMap(javax.swing.JComponent.WHEN_IN_FOCUSED_WINDOW)
+                .put(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ENTER, 0), "returnToMenuOnGameOver");
+
+        this.getActionMap().put("returnToMenuOnGameOver", new javax.swing.AbstractAction() {
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent e) {
+                // شرط باخت: اگر جان فضاپیما صفر یا کمتر شده باشد
+                if (plane.getLives() <= 0) {
+
+                    // پیدا کردن فرم اصلی بازی و بستن آن
+                    java.awt.Window topFrame = javax.swing.SwingUtilities.getWindowAncestor(GamePanel.this);
+                    if (topFrame != null) {
+                        topFrame.dispose();
+                    }
+
+                    // بیدار کردن و نمایش مجدد منوی اصلی
+                    if (GamePanel.this.mainMenu != null) {
+                        GamePanel.this.mainMenu.setVisible(true);
+                    }
+                }
+            }
+        });
     }
 
     @Override
@@ -64,6 +141,13 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
     private void updateGame() {
         if (plane.getLives() <= 0) {
             gameTimer.stop();
+
+            //  ذخیره رکورد در صورت باخت
+            if (!scoreSaved && UserSession.isLoggedIn()) {
+                DatabaseManager.saveGameRecord(UserSession.getUsername(), score, currentLevel, "Default Settings");
+                scoreSaved = true;
+                System.out.println("Game Over record saved into database!");
+            }
             return;
         }
 
@@ -144,40 +228,95 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
             }
         }
 
-        // ۶. سیستم برخورد تیرهای هواپیما به مرغ‌ها + شانس سقوط پاورآپ + ایجاد انفجار
-        for (int i = 0; i < bullets.size(); i++) {
-            model.Bullet b = bullets.get(i);
-            for (int j = 0; j < enemies.size(); j++) {
-                Enemy enemy = enemies.get(j);
+        // ۶. سیستم برخورد تیرهای هواپیما به مرغ‌ها / غول‌ها (تفکیک منطق غول از مرغ‌ها)
 
-                if (b.getBounds().intersects(enemy.getBounds())) {
-                    bullets.remove(i);
-                    i--;
-                    enemy.takeDamage();
+        //  حالت اول: مدیریت اختصاصی غول (مرحله ۴ و ۸)
+        if (currentLevel == 4 || currentLevel == 8) {
+            if (!enemies.isEmpty()) {
+                Enemy boss = enemies.get(0);
 
-                    if (!enemy.isActive()) {
-                        score += 10;
-                        gridManager.handleEnemyDeath(enemy);
+                for (int i = 0; i < bullets.size(); i++) {
+                    model.Bullet b = bullets.get(i);
 
-                        // 💥 اصلاح خطا: استفاده از getBounds().width و getBounds().height برای پیدا کردن مرکز
-                        Color expColor = (enemy instanceof model.enemy.Boss) ? Color.ORANGE : Color.RED;
-                        explosions.add(new model.Explosion(
-                                enemy.getX() + (enemy.getBounds().width / 2),
-                                enemy.getY() + (enemy.getBounds().height / 2),
-                                expColor
-                        ));
+                    if (b.getBounds().intersects(boss.getBounds())) {
+                        bullets.remove(i);
+                        i--;
 
-                        // شانس ۲۰ درصدی سقوط پاورآپ در لول‌های معمولی
-                        if (currentLevel != 4 && currentLevel != 8 && Math.random() < 0.20) {
-                            PowerUpType[] types = PowerUpType.values();
-                            PowerUpType randomType = types[(int) (Math.random() * types.length)];
-                            powerUps.add(new PowerUp(enemy.getX(), enemy.getY(), randomType));
+                        if (boss.isActive() && boss.getLives() > 0) {
+                            boss.takeDamage();
+
+                            if (!boss.isActive() || boss.getLives() <= 0) {
+                                score += 100;
+
+                                explosions.add(new model.Explosion(
+                                        boss.getX() + (boss.getBounds().width / 2),
+                                        boss.getY() + (boss.getBounds().height / 2),
+                                        Color.ORANGE
+                                ));
+
+                                enemies.remove(boss);
+
+                                // 🚀 شلیک به باگ: اگر لول ۸ بودیم، یعنی بازی تمام شده و مستقیماً وارد فاز پیروزی می‌شویم
+                                if (currentLevel == 8) {
+                                    gameTimer.stop();
+                                    isVictory = true;
+
+                                    if (!scoreSaved && UserSession.isLoggedIn()) {
+                                        DatabaseManager.saveGameRecord(UserSession.getUsername(), score, currentLevel, "Default Settings");
+                                        scoreSaved = true;
+                                        System.out.println("🏆 Victory record saved into database!");
+                                    }
+                                    return; // خروج فوری از متد آپدیت چون بازی به پایان رسیده است
+                                }
+
+                                // اگر لول ۴ بود، روال عادی تغییر لول به ۵ انجام می‌شود:
+                                gridManager.handleEnemyDeath(boss);
+                                this.currentLevel = gridManager.getCurrentLevel();
+                                return;
+                            }
                         }
-
-                        enemies.remove(j);
-                        j--;
                     }
-                    break;
+                }
+            }
+        }
+        //  حالت دوم: مراحل معمولی (۱، ۲، ۳، ۵، ۶، ۷)
+        else {
+            for (int i = 0; i < bullets.size(); i++) {
+                model.Bullet b = bullets.get(i);
+
+                for (int j = 0; j < enemies.size(); j++) {
+                    Enemy enemy = enemies.get(j);
+
+                    if (b.getBounds().intersects(enemy.getBounds())) {
+                        bullets.remove(i);
+                        i--;
+
+                        if (enemy.isActive() && enemy.getLives() > 0) {
+                            enemy.takeDamage();
+
+                            if (!enemy.isActive() || enemy.getLives() <= 0) {
+                                score += 10;
+                                gridManager.handleEnemyDeath(enemy);
+
+                                explosions.add(new model.Explosion(
+                                        enemy.getX() + (enemy.getBounds().width / 2),
+                                        enemy.getY() + (enemy.getBounds().height / 2),
+                                        Color.RED
+                                ));
+
+                                // شانس سقوط پاورآپ فقط در مراحل معمولی
+                                if (Math.random() < 0.20) {
+                                    PowerUpType[] types = PowerUpType.values();
+                                    PowerUpType randomType = types[(int) (Math.random() * types.length)];
+                                    powerUps.add(new PowerUp(enemy.getX(), enemy.getY(), randomType));
+                                }
+
+                                enemies.remove(j);
+                                j--;
+                            }
+                        }
+                        break;
+                    }
                 }
             }
         }
@@ -227,6 +366,17 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
                 i--;
             }
         }
+
+        if (currentLevel == 8 && enemies.isEmpty()) {
+            gameTimer.stop();
+            isVictory = true;
+            this.requestFocusInWindow();
+            if (!scoreSaved && UserSession.isLoggedIn()) {
+                DatabaseManager.saveGameRecord(UserSession.getUsername(), score, currentLevel, "Default Settings");
+                scoreSaved = true;
+                System.out.println("🏆 Victory record saved into database!");
+            }
+        }
     }
 
     @Override
@@ -236,7 +386,7 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
 
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-        // 🌌 رسم تصویر پس‌زمینه کهکشانی
+        // رسم تصویر پس‌زمینه کهکشانی
         if (backgroundImage != null) {
             g2d.drawImage(backgroundImage, 0, 0, null);
         } else {
@@ -303,20 +453,39 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
         }
 
         // صفحه پیروزی نهایی بازی (Victory)
-        if (currentLevel == 8 && enemies.isEmpty()) {
-            gameTimer.stop();
+        if (isVictory) {
             g2d.setColor(new Color(0, 150, 0, 180));
             g2d.fillRect(0, 0, 800, 600);
             g2d.setColor(Color.WHITE);
             g2d.setFont(new Font("Arial", Font.BOLD, 48));
             g2d.drawString("VICTORY!", 290, 300);
+
+            g2d.setFont(new Font("Arial", Font.PLAIN, 18));
+            g2d.drawString("Press ENTER to return to Main Menu", 255, 350);
+        }
+
+        // صفحه باخت نهایی (Game Over)
+        if (plane.getLives() <= 0) {
+            g2d.setColor(new Color(150, 0, 0, 180));
+            g2d.fillRect(0, 0, 800, 600);
+            g2d.setColor(Color.WHITE);
+            g2d.setFont(new Font("Arial", Font.BOLD, 48));
+            g2d.drawString("GAME OVER", 260, 300);
+
+            // اضافه کردن متن راهنما برای بازیکن هنگام باخت
+            g2d.setFont(new Font("Arial", Font.PLAIN, 18));
+            g2d.drawString("Press ESC or ENTER to return to Main Menu", 230, 350);
         }
     }
 
     private void drawHUD(Graphics2D g2d) {
         g2d.setColor(Color.WHITE);
         g2d.setFont(new Font("Arial", Font.BOLD, 14));
-        g2d.drawString("USER: Player1", 20, 30);
+
+        //  استفاده از نام کاربری که لاگین کرده است
+        String currentUser = UserSession.isLoggedIn() ? UserSession.getUsername() : "Guest";
+        g2d.drawString("USER: " + currentUser, 20, 30);
+
         g2d.drawString("SCORE: " + score, 20, 55);
         g2d.drawString("LIVES: " + plane.getLives(), 20, 80);
         g2d.drawString("FIRE POWER: x" + plane.getFireLevel(), 20, 105);
@@ -325,9 +494,23 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
 
     @Override
     public void keyPressed(KeyEvent e) {
-        if (plane.getLives() <= 0 || (currentLevel == 8 && enemies.isEmpty())) return;
-
         int key = e.getKeyCode();
+
+        if (isVictory && key == KeyEvent.VK_ENTER) {
+            // پیدا کردن پنجره اصلی بازی (JFrame)
+            Window topFrame = SwingUtilities.getWindowAncestor(this);
+            if (topFrame != null) {
+                topFrame.dispose(); // بستن پنجره بازی
+            }
+
+            // باز کردن مجدد منوی اصلی
+            SwingUtilities.invokeLater(() -> {
+                new view.MainMenu().setVisible(true);
+            });
+            return;
+        }
+
+        if (plane.getLives() <= 0 || (currentLevel == 8 && enemies.isEmpty())) return;
 
         if (key == KeyEvent.VK_LEFT || key == KeyEvent.VK_A) plane.setDx(-plane.getSpeed());
         if (key == KeyEvent.VK_RIGHT || key == KeyEvent.VK_D) plane.setDx(plane.getSpeed());
