@@ -72,6 +72,7 @@ public class GridManager {
 
     // چیدن مرغ‌ها یا غول‌ها متناسب با مرحله بازی
     private void setupGrid() {
+        // ⬇️ خیلی مهم: این خط باعث میشه لیست اصلی توی GamePanel هم کاملاً پاک بشه
         activeEnemies.clear();
         currentBoss = null;
 
@@ -102,6 +103,8 @@ public class GridManager {
 
                 Enemy enemy = createEnemyForLevel(cellX, cellY);
                 grid[r][c].setCurrentEnemy(enemy);
+
+                // ⬇️ مرغ‌های جدید لول بعدی مستقیماً به لیست بازی فرستاده می‌شوند
                 activeEnemies.add(enemy);
             }
         }

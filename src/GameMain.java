@@ -1,27 +1,21 @@
-import javax.swing.*;
-import view.GamePanel;
+import view.MainMenu;
+import javax.swing.SwingUtilities;
 
-import java.io.File;
-
-public class GameMain extends JFrame {
-    public GameMain() {
-        setTitle("Chicken Invaders - AP Project");
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setResizable(false);
-
-        GamePanel gamePanel = new GamePanel();
-        add(gamePanel);
-
-        pack();
-        setLocationRelativeTo(null);
-    }
-
+public class GameMain {
     public static void main(String[] args) {
+        // ۱. ابتدا لود دیتابیس و ساخت جداول
+        try {
+            Class.forName("model.database.DatabaseManager");
+            System.out.println(" دیتابیس با موفقیت آماده‌سازی شد.");
+        } catch (ClassNotFoundException e) {
+            System.out.println(" خطا در لود درایور دیتابیس!");
+            e.printStackTrace();
+        }
+
+        // ۲. باز کردن منوی اصلی به جای ورود مستقیم به بازی
         SwingUtilities.invokeLater(() -> {
-            new GameMain().setVisible(true);
+            MainMenu menu = new MainMenu();
+            menu.setVisible(true);
         });
     }
-
-
-
 }
