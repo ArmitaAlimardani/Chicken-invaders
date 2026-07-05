@@ -4,119 +4,140 @@ import java.sql.*;
 import java.util.ArrayList;
 
 public class DatabaseManager {
-    private static final String URL = "jdbc:sqlite:game.db"; // یا university.db بر اساس نیازت
+    // آدرس فایل دیتابیس در ریشه پروژه (بند ۲.۲)
+    private static final String URL = "jdbc:sqlite:game.db";
 
     static {
-        // ایجاد جدول‌ها در صورت عدم وجود هنگام لود شدن کلاس
+        // بلوک استاتیک برای ساخت خودکار جداول به محض لود شدن کلاس در برنامه
         try (Connection conn = DriverManager.getConnection(URL);
              Statement stmt = conn.createStatement()) {
 
-            // ۱. جدول کاربران
-            String createUsersTable = "CREATE TABLE IF NOT EXISTS users (" +
+            // ۱. جدول کاربران (ذخیره اطلاعات پایه و تنظیمات - بند ۲.۲)
+            stmt.execute("CREATE TABLE IF NOT EXISTS users (" +
                     "username TEXT PRIMARY KEY, " +
                     "password TEXT NOT NULL, " +
-                    "high_score INTEGER DEFAULT 0, " +
-                    "music_on INTEGER DEFAULT 1, " +
-                    "shoot_sound_on INTEGER DEFAULT 1, " +
-                    "hit_sound_on INTEGER DEFAULT 1, " +
-                    "gameover_sound_on INTEGER DEFAULT 1, " +
+                    "sound_settings TEXT DEFAULT 'ON', " +
                     "last_level INTEGER DEFAULT 1" +
-                    ");";
-            stmt.execute(createUsersTable);
+                    ");");
 
-            // ۲. جدول تاریخچه بازی‌ها (برای بند ۲.۳)
-            String createGamesTable = "CREATE TABLE IF NOT EXISTS games (" +
+            // ۲. جدول رکوردهای هر بار اجرای بازی (جزئیات پیروزی/شکست - بند ۲.۳)
+            stmt.execute("CREATE TABLE IF NOT EXISTS game_records (" +
                     "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
                     "username TEXT, " +
                     "final_score INTEGER, " +
                     "last_level INTEGER, " +
-                    "play_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
-                    "settings_summary TEXT, " +
-                    "FOREIGN KEY(username) REFERENCES users(username)" +
-                    ");";
-            stmt.execute(createGamesTable);
+                    "timestamp DATETIME DEFAULT CURRENT_TIMESTAMP, " +
+                    "sound_settings TEXT" +
+                    ");");
 
+            System.out.println("✅ دیتابیس SQLite متصل شد و جداول بررسی/ساخته شدند.");
         } catch (SQLException e) {
+            System.err.println("❌ خطا در راه‌اندازی اولیه دیتابیس:");
             e.printStackTrace();
         }
     }
 
-    // متد ثبت‌نام کاربر جدید (بررسی تکراری نبودن نام کاربری)
+    /**
+     * ثبت‌نام کاربر جدید با بررسی تکراری نبودن نام کاربری (بند ۲.۲)
+     */
     public static boolean registerUser(String username, String password) {
-        String query = "INSERT INTO users(username, password) VALUES(?, ?)";
+        String sql = "INSERT INTO users(username, password) VALUES(?, ?)";
         try (Connection conn = DriverManager.getConnection(URL);
-             PreparedStatement pstmt = conn.prepareStatement(query)) {
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
             pstmt.setString(1, username);
             pstmt.setString(2, password);
             pstmt.executeUpdate();
-            return true; // ثبت نام موفق
+            return true; // ثبت‌نام موفقیت‌آمیز
+
         } catch (SQLException e) {
-            // اگر نام کاربری تکراری باشد SQLException رخ می‌دهد
+            // در صورت تکراری بودن نام کاربری، SQLite خطای یکتا بودن (Constraint) صادر می‌کند
+            System.out.println("⚠️ نام کاربری '" + username + "' قبلاً ثبت شده است.");
             return false;
         }
     }
 
-    // متد ورود کاربر
+    /**
+     * بررسی صحت اطلاعات ورود کاربر (بند ۲.۲)
+     */
     public static boolean loginUser(String username, String password) {
-        String query = "SELECT password FROM users WHERE username = ? AND password = ?";
+        String sql = "SELECT * FROM users WHERE username = ? AND password = ?";
         try (Connection conn = DriverManager.getConnection(URL);
-             PreparedStatement pstmt = conn.prepareStatement(query)) {
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
             pstmt.setString(1, username);
             pstmt.setString(2, password);
             ResultSet rs = pstmt.executeQuery();
-            return rs.next(); // اگر رکوردی پیدا شد یعنی یوزر و پس درست است
+
+            return rs.next(); // اگر رکوردی پیدا شد یعنی نام کاربری و رمز عبور صحیح است
+
         } catch (SQLException e) {
             e.printStackTrace();
             return false;
         }
     }
 
-    // ثبت رکورد بازی پس از شکست یا پیروزی (بند ۲.۳)
+    /**
+     * ذخیره جزئیات هر بار اجرای بازی پس از پایان (چه پیروزی و چه شکست - بند ۲.۳)
+     */
     public static void saveGameRecord(String username, int score, int level, String soundSettings) {
-        // ۱. ثبت در جدول تاریخچه بازی‌ها
-        String insertGame = "INSERT INTO games(username, final_score, last_level, settings_summary) VALUES(?, ?, ?, ?)";
-        try (Connection conn = DriverManager.getConnection(URL);
-             PreparedStatement pstmt = conn.prepareStatement(insertGame)) {
-            pstmt.setString(1, username);
-            pstmt.setInt(2, score);
-            pstmt.setInt(3, level);
-            pstmt.setString(4, soundSettings);
-            pstmt.executeUpdate();
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
+        String insertRecordSql = "INSERT INTO game_records(username, final_score, last_level, sound_settings) VALUES(?, ?, ?, ?)";
+        String updateCheckUserSql = "UPDATE users SET highest_score = ?, last_level = ? WHERE username = ? AND highest_score < ?";
 
-        // ۲. به‌روزرسانی بالاترین امتیاز در جدول کاربران (در صورت بیشتر بودن)
-        String updateHighScore = "UPDATE users SET high_score = MAX(high_score, ?) WHERE username = ?";
-        try (Connection conn = DriverManager.getConnection(URL);
-             PreparedStatement pstmt = conn.prepareStatement(updateHighScore)) {
-            pstmt.setInt(1, score);
-            pstmt.setString(2, username);
-            pstmt.executeUpdate();
+        try (Connection conn = DriverManager.getConnection(URL)) {
+            conn.setAutoCommit(false); // استفاده از Transaction برای ثبت همزمان
+
+            // ۱. ذخیره جزئیات اجرای بازی
+            try (PreparedStatement pstmt1 = conn.prepareStatement(insertRecordSql)) {
+                pstmt1.setString(1, username);
+                pstmt1.setInt(2, score);
+                pstmt1.setInt(3, level);
+                pstmt1.setString(4, soundSettings);
+                pstmt1.executeUpdate();
+            }
+
+            // ۲. به‌روزرسانی بالاترین امتیاز در جدول اصلی کاربران
+            try (PreparedStatement pstmt2 = conn.prepareStatement(updateCheckUserSql)) {
+                pstmt2.setInt(1, score);
+                pstmt2.setInt(2, level);
+                pstmt2.setString(3, username);
+                pstmt2.setInt(4, score); // فقط اگر امتیاز جدید بیشتر از highest_score فعلی باشد
+                pstmt2.executeUpdate();
+            }
+
+            conn.commit();
+            System.out.println("اطلاعات بازی در هر دو جدول به روز رسانی شد.");
         } catch (SQLException e) {
             e.printStackTrace();
         }
     }
 
-    // استخراج جدول High Scores (به ازای هر کاربر فقط بالاترین امتیاز - بند ۲.۳)
+    /**
+     * استخراج جدول High Scores همراه با تاریخ آخرین رکورد برتر (بند ۲.۳)
+     */
     public static ArrayList<String[]> getHighScores() {
         ArrayList<String[]> list = new ArrayList<>();
-        String query = "SELECT username, MAX(final_score) as top_score, last_level, play_time " +
-                "FROM games GROUP BY username ORDER BY top_score DESC LIMIT 10";
+
+        // کوئری هوشمند: گرفتن بالاترین امتیاز هر کاربر همراه با سطح و زمان ثبت آن رکورد
+        String sql = "SELECT username, MAX(final_score) AS top_score, last_level, timestamp " +
+                "FROM game_records " +
+                "GROUP BY username " +
+                "ORDER BY top_score DESC";
 
         try (Connection conn = DriverManager.getConnection(URL);
              Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(query)) {
+             ResultSet rs = stmt.executeQuery(sql)) {
 
             while (rs.next()) {
                 list.add(new String[]{
                         rs.getString("username"),
                         String.valueOf(rs.getInt("top_score")),
                         String.valueOf(rs.getInt("last_level")),
-                        rs.getString("play_time")
+                        rs.getString("timestamp") // دریافت تاریخ و زمان بازی
                 });
             }
         } catch (SQLException e) {
+            System.err.println("❌ خطا در استخراج جدول امتیازات با تاریخ:");
             e.printStackTrace();
         }
         return list;
