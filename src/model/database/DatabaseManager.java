@@ -30,9 +30,9 @@ public class DatabaseManager {
                     "sound_settings TEXT" +
                     ");");
 
-            System.out.println("✅ دیتابیس SQLite متصل شد و جداول بررسی/ساخته شدند.");
+            System.out.println(" دیتابیس SQLite متصل شد و جداول بررسی/ساخته شدند.");
         } catch (SQLException e) {
-            System.err.println("❌ خطا در راه‌اندازی اولیه دیتابیس:");
+            System.err.println(" خطا در راه‌اندازی اولیه دیتابیس:");
             e.printStackTrace();
         }
     }
@@ -52,7 +52,7 @@ public class DatabaseManager {
 
         } catch (SQLException e) {
             // در صورت تکراری بودن نام کاربری، SQLite خطای یکتا بودن (Constraint) صادر می‌کند
-            System.out.println("⚠️ نام کاربری '" + username + "' قبلاً ثبت شده است.");
+            System.out.println(" نام کاربری '" + username + "' قبلاً ثبت شده است.");
             return false;
         }
     }
@@ -137,9 +137,51 @@ public class DatabaseManager {
                 });
             }
         } catch (SQLException e) {
-            System.err.println("❌ خطا در استخراج جدول امتیازات با تاریخ:");
+            System.err.println(" خطا در استخراج جدول امتیازات با تاریخ:");
             e.printStackTrace();
         }
         return list;
+    }
+
+    /**
+     * به‌روزرسانی ۴ وضعیت صدا به صورت مستقیم در ستون‌های مجزا
+     */
+    public static void updateSoundSettings(String username, int music, int shot, int collision, int gameOver) {
+        String sql = "UPDATE users SET music_enabled = ?, shot_enabled = ?, collision_enabled = ?, gameover_enabled = ? WHERE username = ?";
+        try (Connection conn = DriverManager.getConnection(URL);
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, music);
+            pstmt.setInt(2, shot);
+            pstmt.setInt(3, collision);
+            pstmt.setInt(4, gameOver);
+            pstmt.setString(5, username);
+            pstmt.executeUpdate();
+            System.out.println("ستون‌های صوتی کاربر در دیتابیس به‌روزرسانی شدند.");
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * دریافت وضعیت ۴ صدا به صورت آرایه عددی [music, shot, collision, gameover]
+     */
+    public static int[] getSoundSettings(String username) {
+        String sql = "SELECT music_enabled, shot_enabled, collision_enabled, gameover_enabled FROM users WHERE username = ?";
+        try (Connection conn = DriverManager.getConnection(URL);
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, username);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                return new int[]{
+                        rs.getInt("music_enabled"),
+                        rs.getInt("shot_enabled"),
+                        rs.getInt("collision_enabled"),
+                        rs.getInt("gameover_enabled")
+                };
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return new int[]{1, 1, 1, 1}; // مقدار پیش‌فرض در صورت نبود رکورد
     }
 }
