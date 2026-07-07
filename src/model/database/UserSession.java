@@ -12,7 +12,7 @@ public class UserSession {
     }
 
     public static boolean isLoggedIn() {
-        return loggedInUser != null;
+        return loggedInUser != null && !loggedInUser.trim().isEmpty();
     }
 
     public static void logout() {

@@ -42,25 +42,6 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
     private boolean isFrozen = false;
     private long freezeEndTime = 0;
 
-//    public GamePanel() {
-//        setPreferredSize(new Dimension(800, 600));
-//        setBackground(Color.BLACK);
-//        setFocusable(true);
-//        addKeyListener(this);
-//
-//        // بارگذاری تصویر پس‌زمینه جدید
-//        ImageIcon bgIcon = new ImageIcon("icon\\background.jpg");
-//        if (bgIcon.getImageLoadStatus() == MediaTracker.COMPLETE) {
-//            this.backgroundImage = bgIcon.getImage().getScaledInstance(800, 600, Image.SCALE_SMOOTH);
-//        }
-//
-//        plane = new Plane(362, 480);
-//        gridManager = new model.GridManager(currentLevel, enemies, eggs);
-//
-//        gameTimer = new Timer(16, this);
-//        gameTimer.start();
-//    }
-
     //  تغییر ورودی سازنده برای اتصال منوی اصلی
     public GamePanel(MainMenu mainMenu) {
         this.mainMenu = mainMenu;
@@ -85,16 +66,21 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
         this.getInputMap(javax.swing.JComponent.WHEN_IN_FOCUSED_WINDOW)
                 .put(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ENTER, 0), "returnToMenu");
 
+        // ۱. اکشن مربوط به حالت پیروزی (کلید Enter)
         this.getActionMap().put("returnToMenu", new javax.swing.AbstractAction() {
             @Override
             public void actionPerformed(java.awt.event.ActionEvent e) {
-                if (isVictory) { // اگر پرچم پیروزی فعال شده بود
+                if (isVictory) {
                     Window topFrame = SwingUtilities.getWindowAncestor(GamePanel.this);
                     if (topFrame != null) {
-                        topFrame.dispose(); // بستن پنجره بازی
+                        topFrame.dispose();
                     }
+
+                    // 🚀 پخش مجدد موزیک متن هنگام بازگشت به منوی اصلی
+                    controller.SoundManager.playBackgroundMusic();
+
                     if (GamePanel.this.mainMenu != null) {
-                        GamePanel.this.mainMenu.setVisible(true); // نمایش مجدد همان منوی اصلی
+                        GamePanel.this.mainMenu.setVisible(true);
                     }
                 }
             }
@@ -109,19 +95,19 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
         this.getInputMap(javax.swing.JComponent.WHEN_IN_FOCUSED_WINDOW)
                 .put(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ENTER, 0), "returnToMenuOnGameOver");
 
+        // ۲. اکشن مربوط به حالت باخت (کلید ESC یا Enter)
         this.getActionMap().put("returnToMenuOnGameOver", new javax.swing.AbstractAction() {
             @Override
             public void actionPerformed(java.awt.event.ActionEvent e) {
-                // شرط باخت: اگر جان فضاپیما صفر یا کمتر شده باشد
                 if (plane.getLives() <= 0) {
-
-                    // پیدا کردن فرم اصلی بازی و بستن آن
                     java.awt.Window topFrame = javax.swing.SwingUtilities.getWindowAncestor(GamePanel.this);
                     if (topFrame != null) {
                         topFrame.dispose();
                     }
 
-                    // بیدار کردن و نمایش مجدد منوی اصلی
+                    // 🚀 پخش مجدد موزیک متن هنگام بازگشت به منوی اصلی
+                    controller.SoundManager.playBackgroundMusic();
+
                     if (GamePanel.this.mainMenu != null) {
                         GamePanel.this.mainMenu.setVisible(true);
                     }
@@ -142,9 +128,12 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
         if (plane.getLives() <= 0) {
             gameTimer.stop();
 
-            //  ذخیره رکورد در صورت باخت
+            // 🚀 [اصلاح صوتی ۱]: توقف موزیک متن و پخش صدای باخت بازی
+            controller.SoundManager.stopBackgroundMusic();
+            controller.SoundManager.playGameOverSound();
+
+            // ذخیره رکورد در صورت باخت
             if (!scoreSaved && UserSession.isLoggedIn()) {
-                // ارسال مستقیم مقدار لول از گرید منیجر برای دقت ۱۰۰٪
                 int finalLvl = gridManager.getCurrentLevel();
                 DatabaseManager.saveGameRecord(UserSession.getUsername(), score, finalLvl, "ON");
                 scoreSaved = true;
@@ -165,7 +154,6 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
         if (!isFrozen) {
             gridManager.update();
 
-            //  فعال‌سازی شلیک غول‌ها: اگر در لیست دشمنان، غولی وجود دارد باید حمله کند
             for (Enemy enemy : enemies) {
                 if (enemy instanceof Boss) {
                     ((Boss) enemy).updateAttack(eggs);
@@ -194,9 +182,11 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
                 if (enemy.y > 500) {
                     if (!plane.isShieldActive()) {
                         plane.setLives(plane.getLives() - 1);
-                        //  اضافه شدن انفجار در محل فضاپیما به دلیل نفوذ مرغ به انتهای صفحه
-                        explosions.add(new model.Explosion(plane.getX() + (plane.getWidth() / 2), plane.getY() + (plane.getHeight() / 2), Color.ORANGE
-                        ));
+
+                        // 🚀 افکت صوتی برخورد: کم شدن جان به دلیل نفوذ مرغ
+                        controller.SoundManager.playCollisionSound();
+
+                        explosions.add(new model.Explosion(plane.getX() + (plane.getWidth() / 2), plane.getY() + (plane.getHeight() / 2), Color.ORANGE));
                     }
                     enemy.y = 100;
                 }
@@ -230,8 +220,7 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
             }
         }
 
-        // ۶. سیستم برخورد تیرهای هواپیما به مرغ‌ها / غول‌ها (تفکیک منطق غول از مرغ‌ها)
-        //  مدیریت اختصاصی غول (مرحله ۴ و ۸)
+        // ۶. سیستم برخورد تیرهای هواپیما به مرغ‌ها / غول‌ها
         if (currentLevel == 4 || currentLevel == 8) {
             if (!enemies.isEmpty()) {
                 Enemy boss = enemies.get(0);
@@ -249,6 +238,8 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
                             if (!boss.isActive() || boss.getLives() <= 0) {
                                 score += 100;
 
+                                controller.SoundManager.playCollisionSound();
+
                                 explosions.add(new model.Explosion(
                                         boss.getX() + (boss.getBounds().width / 2),
                                         boss.getY() + (boss.getBounds().height / 2),
@@ -257,12 +248,14 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
 
                                 enemies.remove(boss);
 
-                                // 🚀 اصلاح این بخش: اگر لول ۸ بود، رکورد پیروزی ثبت شود
                                 if (currentLevel == 8) {
                                     gameTimer.stop();
                                     isVictory = true;
 
-                                    // ذخیره در دیتابیس
+                                    // 🚀 [اصلاح صوتی ۲]: توقف موزیک متن و پخش صدای پیروزی در مرحله نهایی غول
+                                    controller.SoundManager.stopBackgroundMusic();
+                                    controller.SoundManager.playGameOverSound();
+
                                     if (!scoreSaved && UserSession.isLoggedIn()) {
                                         DatabaseManager.saveGameRecord(UserSession.getUsername(), score, 8, "ON");
                                         scoreSaved = true;
@@ -271,7 +264,6 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
                                     return;
                                 }
 
-                                // روال عادی لول ۴
                                 gridManager.handleEnemyDeath(boss);
                                 this.currentLevel = gridManager.getCurrentLevel();
                                 return;
@@ -281,7 +273,6 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
                 }
             }
         }
-        //  حالت دوم: مراحل معمولی (۱، ۲، ۳، ۵، ۶، ۷)
         else {
             for (int i = 0; i < bullets.size(); i++) {
                 model.Bullet b = bullets.get(i);
@@ -300,13 +291,14 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
                                 score += 10;
                                 gridManager.handleEnemyDeath(enemy);
 
+                                controller.SoundManager.playCollisionSound();
+
                                 explosions.add(new model.Explosion(
                                         enemy.getX() + (enemy.getBounds().width / 2),
                                         enemy.getY() + (enemy.getBounds().height / 2),
                                         Color.RED
                                 ));
 
-                                // شانس سقوط پاورآپ فقط در مراحل معمولی
                                 if (Math.random() < 0.20) {
                                     PowerUpType[] types = PowerUpType.values();
                                     PowerUpType randomType = types[(int) (Math.random() * types.length)];
@@ -323,7 +315,7 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
             }
         }
 
-        // ۷. سیستم برخورد تخم‌مرغ‌ها به هواپیما (با اعمال افکت انفجار فضاپیما هنگام خسارت)
+        // ۷. سیستم برخورد تخم‌مرغ‌ها به هواپیما
         for (int i = 0; i < eggs.size(); i++) {
             model.Egg egg = eggs.get(i);
             if (egg.getBounds().intersects(plane.getBounds())) {
@@ -333,17 +325,14 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
                 if (!plane.isShieldActive()) {
                     plane.setLives(plane.getLives() - 1);
 
-                    // 💥 ایجاد افکت انفجار در مرکز فضاپیما به دلیل از دست دادن جان (بند ۴.۷)
-                    explosions.add(new model.Explosion(
-                            plane.getX() + (plane.getWidth() / 2),
-                            plane.getY() + (plane.getHeight() / 2),
-                            Color.YELLOW
-                    ));
+                    controller.SoundManager.playCollisionSound();
+
+                    explosions.add(new model.Explosion(plane.getX() + (plane.getWidth() / 2), plane.getY() + (plane.getHeight() / 2), Color.YELLOW));
                 }
             }
         }
 
-        // ۸. سیستم برخورد هواپیما با پاورآپ‌ها و جذب آن‌ها
+        // ۸. سیستم برخورد هواپیما با پاورآپ‌ها
         for (int i = 0; i < powerUps.size(); i++) {
             PowerUp p = powerUps.get(i);
             if (p.getBounds().intersects(plane.getBounds())) {
@@ -359,7 +348,7 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
             }
         }
 
-        // ۹. آپدیت منطقی افکت‌های انفجار و حذف افکت‌های پایان یافته از حافظه
+        // ۹. آپدیت افکت‌های انفجار
         for (int i = 0; i < explosions.size(); i++) {
             model.Explosion exp = explosions.get(i);
             exp.update();
@@ -369,10 +358,16 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
             }
         }
 
+        // بررسی پیروزی نهایی در انتهای لول ۸
         if (currentLevel == 8 && enemies.isEmpty()) {
             gameTimer.stop();
             isVictory = true;
             this.requestFocusInWindow();
+
+            // 🚀 [اصلاح صوتی ۳]: توقف موزیک متن و پخش صدای پیروزی نهایی
+            controller.SoundManager.stopBackgroundMusic();
+            controller.SoundManager.playGameOverSound();
+
             if (!scoreSaved && UserSession.isLoggedIn()) {
                 DatabaseManager.saveGameRecord(UserSession.getUsername(), score, currentLevel, "Default Settings");
                 scoreSaved = true;
@@ -499,13 +494,14 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
         int key = e.getKeyCode();
 
         if (isVictory && key == KeyEvent.VK_ENTER) {
-            // پیدا کردن پنجره اصلی بازی (JFrame)
             Window topFrame = SwingUtilities.getWindowAncestor(this);
             if (topFrame != null) {
-                topFrame.dispose(); // بستن پنجره بازی
+                topFrame.dispose();
             }
 
-            // باز کردن مجدد منوی اصلی
+            //  پخش مجدد موزیک متن برای نمونه‌ای که تازه ساخته می‌شود
+            controller.SoundManager.playBackgroundMusic();
+
             SwingUtilities.invokeLater(() -> {
                 new view.MainMenu().setVisible(true);
             });
@@ -520,6 +516,10 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
         if (key == KeyEvent.VK_DOWN || key == KeyEvent.VK_S) plane.setDy(plane.getSpeed());
 
         if (key == KeyEvent.VK_SPACE) {
+
+            controller.SoundManager.playShotSound();
+
+
             if (plane.canShoot()) {
                 int bulletX = plane.getX() + (plane.getWidth() / 2);
                 int bulletY = plane.getY();

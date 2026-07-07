@@ -14,7 +14,6 @@ public class TestDatabase {
     }
 
 
-
     private static void printTable(String query) {
         try (Connection conn = DriverManager.getConnection(URL);
              Statement stmt = conn.createStatement();
@@ -23,19 +22,58 @@ public class TestDatabase {
             ResultSetMetaData metaData = rs.getMetaData();
             int columnCount = metaData.getColumnCount();
 
-            // چاپ نام ستون‌ها
+            // تنظیم عرض ستون‌ها (حداقل ۱۵ کاراکتر برای هر ستون)
+            int[] columnWidths = new int[columnCount + 1];
             for (int i = 1; i <= columnCount; i++) {
-                System.out.print(metaData.getColumnName(i) + "\t\t");
+                columnWidths[i] = Math.max(metaData.getColumnName(i).length(), 15);
             }
-            System.out.println("\n------------------------------------------------------------------------------------");
 
-            // چاپ سطرها
+            // ۱. چاپ خط جداکننده بالا
+            for (int i = 1; i <= columnCount; i++) {
+                System.out.print("+");
+                for (int j = 0; j < columnWidths[i] + 2; j++) System.out.print("-");
+            }
+            System.out.println("+");
+
+            // ۲. چاپ نام ستون‌ها
+            for (int i = 1; i <= columnCount; i++) {
+                System.out.printf("| %-" + columnWidths[i] + "s ", metaData.getColumnName(i));
+            }
+            System.out.println("|");
+
+            // ۳. چاپ خط جداکننده وسط
+            for (int i = 1; i <= columnCount; i++) {
+                System.out.print("+");
+                for (int j = 0; j < columnWidths[i] + 2; j++) System.out.print("-");
+            }
+            System.out.println("+");
+
+            // ۴. چاپ مقادیر سطرها و ترجمه هوشمند ۰ و ۱ به ON و OFF
             while (rs.next()) {
                 for (int i = 1; i <= columnCount; i++) {
-                    System.out.print(rs.getString(i) + "\t\t");
+                    String columnName = metaData.getColumnName(i);
+                    String val = rs.getString(i);
+
+                    if (val == null) {
+                        val = "NULL";
+                    }
+                    // ترجمه فقط موقع نمایش در ترمینال
+                    else if (columnName.contains("enabled") || columnName.contains("sound") || columnName.contains("music")) {
+                        if (val.equals("1")) val = "ON";
+                        else if (val.equals("0")) val = "OFF";
+                    }
+
+                    System.out.printf("| %-" + columnWidths[i] + "s ", val);
                 }
-                System.out.println();
+                System.out.println("|");
             }
+
+            // ۵. چاپ خط جداکننده پایین
+            for (int i = 1; i <= columnCount; i++) {
+                System.out.print("+");
+                for (int j = 0; j < columnWidths[i] + 2; j++) System.out.print("-");
+            }
+            System.out.println("+");
 
         } catch (SQLException e) {
             System.out.println(" خطایی در خواندن دیتابیس رخ داد: " + e.getMessage());

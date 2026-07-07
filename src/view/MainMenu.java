@@ -12,6 +12,8 @@ import java.util.ArrayList;
 public class MainMenu extends JFrame {
 
     public MainMenu() {
+        controller.SoundManager.playBackgroundMusic(); // شروع موزیک متن در منو
+
         // تنظیمات اصلی پنجره منو
         setTitle("منوی اصلی - Chicken Invaders");
         setSize(500, 600);
@@ -80,7 +82,13 @@ public class MainMenu extends JFrame {
         });
 
         // ۳. تنظیمات صدا (Settings)
-        btnSettings.addActionListener(e -> showSettingsDialog());
+        btnSettings.addActionListener(e -> {
+            SettingsPanel settingsPanel = new SettingsPanel(this, mainPanel);
+            this.getContentPane().removeAll();
+            this.add(settingsPanel);
+            this.revalidate();
+            this.repaint();
+        });
 
         // ۴. راهنمای بازی (How to Play)
         btnHowToPlay.addActionListener(e -> JOptionPane.showMessageDialog(this,
@@ -92,6 +100,47 @@ public class MainMenu extends JFrame {
 
         // ۵. خروج (Exit)
         btnExit.addActionListener(e -> System.exit(0));
+
+        //-----------------------------
+        //(Setting)
+        // ۱. ابتدا تمام اکشن‌های قدیمی و موازی که ممکن است روی این دکمه چسبیده باشند را پاک کن
+        for (ActionListener al : btnSettings.getActionListeners()) {
+            btnSettings.removeActionListener(al);
+        }
+
+        // ۲. حالا اکشن اصلی و کنترل‌شده را قرار بده
+        btnSettings.addActionListener(e -> {
+            if (model.database.UserSession.isLoggedIn()) {
+                SettingsPanel settingsPanel = new SettingsPanel(this, mainPanel);
+                this.getContentPane().removeAll();
+                this.add(settingsPanel);
+                this.revalidate();
+                this.repaint();
+            } else {
+                JOptionPane.showMessageDialog(
+                        this,
+                        "⚠️ برای دسترسی به تنظیمات صدا، ابتدا باید وارد حساب کاربری خود شوید!",
+                        "خطای عدم ورود",
+                        JOptionPane.WARNING_MESSAGE
+                );
+            }
+        });
+
+        btnHowToPlay.addActionListener(e -> {
+            // ایجاد یک دایالوگ مودال (Modal) که روی منوی اصلی قفل می‌شود
+            JDialog howToPlayDialog = new JDialog(this, "How to Play", true);
+            howToPlayDialog.setSize(800, 600);
+            howToPlayDialog.setResizable(false);
+            howToPlayDialog.setLocationRelativeTo(this); // قرار گرفتن دقیق در مرکز مانیتور
+
+            // اضافه کردن پنل اصلاح‌شده به دایالوگ جدید
+            HowToPlayPanel howToPlayPanel = new HowToPlayPanel(howToPlayDialog);
+            howToPlayDialog.add(howToPlayPanel);
+
+            // نمایش پنجره جدید با سایز ۸۰۰ در ۶۰۰
+            howToPlayDialog.setVisible(true);
+        });
+
     }
 
     // متد کمکی برای استایل‌دهی یکدست به دکمه‌ها
