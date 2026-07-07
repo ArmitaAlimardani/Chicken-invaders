@@ -126,6 +126,21 @@ public class MainMenu extends JFrame {
             }
         });
 
+        btnHowToPlay.addActionListener(e -> {
+            // ایجاد یک دایالوگ مودال (Modal) که روی منوی اصلی قفل می‌شود
+            JDialog howToPlayDialog = new JDialog(this, "How to Play", true);
+            howToPlayDialog.setSize(800, 600);
+            howToPlayDialog.setResizable(false);
+            howToPlayDialog.setLocationRelativeTo(this); // قرار گرفتن دقیق در مرکز مانیتور
+
+            // اضافه کردن پنل اصلاح‌شده به دایالوگ جدید
+            HowToPlayPanel howToPlayPanel = new HowToPlayPanel(howToPlayDialog);
+            howToPlayDialog.add(howToPlayPanel);
+
+            // نمایش پنجره جدید با سایز ۸۰۰ در ۶۰۰
+            howToPlayDialog.setVisible(true);
+        });
+
     }
 
     // متد کمکی برای استایل‌دهی یکدست به دکمه‌ها
