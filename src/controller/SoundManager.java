@@ -122,4 +122,20 @@ public class SoundManager {
             }
         }).start();
     }
+
+    // بررسی اینکه آیا در حال حاضر موزیک فعال است یا خیر
+    public static boolean isMusicEnabled() {
+        return isMusicEnabled;
+    }
+
+    // متد هوشمند برای قطع و وصل کامل صداها با فشردن یک دکمه
+    public static void toggleAllSounds() {
+        if (isMusicEnabled) {
+            // اگر صدا وصل است، همه چیز را صفر (خاموش) کن
+            updateSettings("0,0,0,0");
+        } else {
+            // اگر صدا قطع است، همه را یک (روشن) کن
+            updateSettings("1,1,1,1");
+        }
+    }
 }
