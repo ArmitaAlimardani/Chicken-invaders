@@ -316,5 +316,20 @@ public class GridManager {
         }
     }
 
+    //  متد اختصاصی برای تنظیم مجدد لول و چیدمان شبکه مرغ‌ها در زمان ری‌استارت بازی
+    public void resetToLevel(int level) {
+        this.currentLevel = level;
+        this.direction = 1;            // ریست کردن جهت حرکت شبکه به سمت راست
+        this.lastEggDropTime = 0;       // ریست کردن زمان‌سنج شلیک تخم‌مرغ‌ها
+
+        // ۱. مقداردهی مجدد پارامترهای سرعت و جان مرغ‌ها بر اساس لول جدید (لول ۱)
+        initLevelParameters();
+
+        // ۲. خالی کردن لیست غول‌ها و بازسازی ماتریس ۵ در ۸ مرغ‌ها از سقف
+        setupGrid();
+
+        System.out.println("GridManager successfully reset to Level " + level);
+    }
+
     public int getCurrentLevel() { return currentLevel; }
 }

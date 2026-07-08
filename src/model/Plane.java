@@ -145,4 +145,17 @@ public class Plane {
                 break;
         }
     }
+
+    //  متد اختصاصی برای تنظیم مجدد موقعیت سفینه در زمان ری‌استارت بازی
+    public void setLocation(int x, int y) {
+        this.x = x;
+        this.y = y;
+        this.dx = 0; // متوقف کردن هرگونه حرکت قبلی سفینه
+        this.dy = 0;
+    }
+
+    //  Setter برای ریست کردن سطح تیرها
+    public void setFireLevel(int fireLevel) {
+        this.fireLevel = fireLevel;
+    }
 }
