@@ -26,13 +26,7 @@ public class Bullet {
     }
 
     public void draw(Graphics2D g2d) {
-        if (bulletImage != null) {
             g2d.drawImage(bulletImage, x, y, width, height, null);
-        } else {
-            // بازگشت به حالت کلاسیک در صورت نبود فایل تصویر
-            g2d.setColor(Color.RED);
-            g2d.fillRect(x, y, width, height);
-        }
     }
 
     public Rectangle getBounds() {
