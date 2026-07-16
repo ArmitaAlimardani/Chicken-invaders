@@ -4,8 +4,8 @@ import java.awt.*;
 
 public abstract class Enemy {
     public int x, y;
-    protected int width = 90;
-    protected int height = 90;
+    protected int width = 80;
+    protected int height = 80;
     protected int speedX, speedY;
     protected int lives;
     protected boolean active = true;

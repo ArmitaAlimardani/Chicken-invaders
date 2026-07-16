@@ -6,8 +6,8 @@ import java.awt.*;
 
 public class Plane {
     private int x, y;
-    private int width = 140;
-    private int height = 140;
+    private int width = 85;
+    private int height = 85;
     private int speed = 5;
     private int dx, dy;
 

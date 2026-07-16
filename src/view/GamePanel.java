@@ -150,6 +150,32 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
             return;
         }
 
+        // چک کردن برخورد هواپیما با مرغ‌ها
+        if (!plane.isShieldActive()) { //  فقط اگر سپر فعال نباشد
+            for (int i = 0; i < enemies.size(); i++) {
+                Enemy enemy = enemies.get(i);
+
+                if (plane.getBounds().intersects(enemy.getBounds())) {
+                    // ۱. کاهش جان هواپیما
+                    plane.setLives(plane.getLives() - 1);
+
+                    // ۲. پخش صدای برخورد
+                    controller.SoundManager.playCollisionSound();
+
+                    // ۳. ایجاد افکت انفجار در محل هواپیما
+                    explosions.add(new model.Explosion(
+                            plane.getX() + (plane.getWidth() / 2),
+                            plane.getY() + (plane.getHeight() / 2),
+                            Color.RED));
+
+                    // ۴. حذف مرغی که با هواپیما برخورد کرده (یا حذف هواپیما/کاهش جان)
+                    // طبق منطق بازی، حذف مرغ برخورد کرده عادلانه است
+                    enemies.remove(i);
+                    i--;
+                }
+            }
+        }
+
         //  حرکت دادن موقعیت پس‌زمینه (فقط در صورتی که بازی متوقف نباشد)
         if (!isPaused) {
             backgroundY += 2; // سرعت اسکرول شدن ستاره‌ها به سمت پایین
