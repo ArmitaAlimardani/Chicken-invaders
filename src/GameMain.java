@@ -3,7 +3,6 @@ import javax.swing.SwingUtilities;
 
 public class GameMain {
     public static void main(String[] args) {
-        // ۱. ابتدا لود دیتابیس و ساخت جداول
         try {
             Class.forName("model.database.DatabaseManager");
             System.out.println(" دیتابیس با موفقیت آماده‌سازی شد.");
@@ -12,7 +11,6 @@ public class GameMain {
             e.printStackTrace();
         }
 
-        // ۲. باز کردن منوی اصلی به جای ورود مستقیم به بازی
         SwingUtilities.invokeLater(() -> {
             MainMenu menu = new MainMenu();
             menu.setVisible(true);

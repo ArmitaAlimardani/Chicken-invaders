@@ -1,5 +1,7 @@
 package model;
 
+import view.GamePanel;
+
 import javax.swing.*;
 import java.awt.*;
 
@@ -8,30 +10,56 @@ public class Plane {
     private int x, y;
     private int width = 85;
     private int height = 85;
-    private int speed = 5;
+
     private int dx, dy;
 
-    private int lives = 3;
     private int fireLevel = 1;
 
     private long lastShotTime = 0;
-    private long baseShotCooldown = 300;
     private long rapidFireEndTime = 0;
 
     private long shieldEndTime = 0;
 
     private Image planeImage;
 
-    public Plane(int x, int y) {
+    private int speed;
+    private int lives;
+    private long baseShotCooldown;
+
+    public void loadStats(String planeName) {
+        switch (planeName) {
+            case "Fast":
+                this.speed = 7;
+                this.lives = 3;
+                this.baseShotCooldown = 250;
+                break;
+            case "Heavy":
+                this.speed = 4;
+                this.lives = 5;
+                this.baseShotCooldown = 200;
+                break;
+            case "Sniper":
+                this.speed = 5;
+                this.lives = 3;
+                this.baseShotCooldown = 150;
+                break;
+            default:
+                this.speed = 5;
+                this.lives = 3;
+                this.baseShotCooldown = 300;
+                break;
+        }
+    }
+
+    public Plane(int x, int y, String planeName) {
         this.x = x;
         this.y = y;
 
-
-        ImageIcon icon = new ImageIcon("icon\\plane.png");
-        this.planeImage = icon.getImage();
-        this.planeImage = this.planeImage.getScaledInstance(width, height, Image.SCALE_SMOOTH);
+        this.planeImage = new ImageIcon("icon/" + planeName + ".png").getImage();
+        loadStats(planeName);
 
     }
+
 
     public void setLives(int lives) { this.lives = lives; }
 
@@ -86,7 +114,6 @@ public class Plane {
         }
     }
 
-    // متدهای فعال‌سازی پاورآپ‌ها
     public void activateShield(int durationSeconds) {
         shieldEndTime = System.currentTimeMillis() + (durationSeconds * 1000L);
     }
@@ -111,7 +138,6 @@ public class Plane {
         return System.currentTimeMillis() < rapidFireEndTime;
     }
 
-    // Getters & Setters
     public void setDx(int dx) { this.dx = dx; }
     public void setDy(int dy) { this.dy = dy; }
     public int getX() { return x; }
@@ -132,29 +158,26 @@ public class Plane {
                 incrementFireLevel();
                 break;
             case RAPID_FIRE:
-                activatePremiumRapidFire(8); // ۸ ثانیه شلیک سریع طبق بند ۴.۶
+                activatePremiumRapidFire(8);
                 break;
             case EXTRA_LIFE:
-                addLife(); // سقف ۵ جان درون متد خودش هندل شده است
+                addLife();
                 break;
             case SHIELD:
-                activateShield(10); // ۱۰ ثانیه مصونیت طبق بند ۴.۶
+                activateShield(10);
                 break;
             case FREEZE_BOMB:
-                // افکت این بمب محیطی است و مستقیماً در GamePanel مدیریت می‌شود.
                 break;
         }
     }
 
-    //  متد اختصاصی برای تنظیم مجدد موقعیت سفینه در زمان ری‌استارت بازی
     public void setLocation(int x, int y) {
         this.x = x;
         this.y = y;
-        this.dx = 0; // متوقف کردن هرگونه حرکت قبلی سفینه
+        this.dx = 0;
         this.dy = 0;
     }
 
-    //  Setter برای ریست کردن سطح تیرها
     public void setFireLevel(int fireLevel) {
         this.fireLevel = fireLevel;
     }

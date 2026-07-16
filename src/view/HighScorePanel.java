@@ -10,9 +10,8 @@ public class HighScorePanel extends JPanel {
     private JTable table;
     private DefaultTableModel tableModel;
     private MainMenu mainMenu;
-    private JPanel menuPanel; //  ذخیره پنل اصلی منو برای بازگشت بدون خطا
+    private JPanel menuPanel;
 
-    //  تغییر در ورودی‌های سازنده
     public HighScorePanel(MainMenu mainMenu, JPanel menuPanel) {
         this.mainMenu = mainMenu;
         this.menuPanel = menuPanel;
@@ -20,14 +19,12 @@ public class HighScorePanel extends JPanel {
         setLayout(new BorderLayout());
         setBackground(Color.BLACK);
 
-        // ۱. عنوان بالای صفحه
         JLabel titleLabel = new JLabel("* جدول بالاترین امتیازها *", JLabel.CENTER);
         titleLabel.setForeground(Color.YELLOW);
         titleLabel.setFont(new Font("Arial", Font.BOLD, 26));
         titleLabel.setBorder(BorderFactory.createEmptyBorder(20, 0, 20, 0));
         add(titleLabel, BorderLayout.NORTH);
 
-        // ۲. ساختار جدول داده‌ها
         String[] columnNames = {"نام کاربر", "امتیاز نهایی", "سطح رسیده", "تاریخ و زمان بازی"};
         tableModel = new DefaultTableModel(columnNames, 0) {
             @Override
@@ -51,7 +48,6 @@ public class HighScorePanel extends JPanel {
         scrollPane.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
         add(scrollPane, BorderLayout.CENTER);
 
-        // ۳. دکمه بازگشت به منوی اصلی
         JButton btnBack = new JButton("بازگشت به منوی اصلی");
         btnBack.setFont(new Font("Arial", Font.BOLD, 16));
         btnBack.setForeground(Color.WHITE);
@@ -64,11 +60,10 @@ public class HighScorePanel extends JPanel {
         buttonPanel.add(btnBack);
         add(buttonPanel, BorderLayout.SOUTH);
 
-        //  اکشن اصلاح‌شده و ۱۰۰٪ امن دکمه بازگشت
         btnBack.addActionListener(e -> {
             if (this.mainMenu != null && this.menuPanel != null) {
-                this.mainMenu.getContentPane().removeAll(); // خالی کردن فریم
-                this.mainMenu.add(this.menuPanel);          // بازگرداندن پنل اصلی منو
+                this.mainMenu.getContentPane().removeAll();
+                this.mainMenu.add(this.menuPanel);
                 this.mainMenu.revalidate();
                 this.mainMenu.repaint();
             }

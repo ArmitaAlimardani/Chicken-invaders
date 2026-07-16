@@ -32,7 +32,6 @@ public class RegisterPanel extends JPanel {
                 return;
             }
 
-            // متد دیتابیس تکراری بودن را بررسی میکند (بند ۲.۲)
             if (DatabaseManager.registerUser(username, password)) {
                 JOptionPane.showMessageDialog(this, "ثبت‌نام با موفقیت انجام شد! حالا می‌توانید از تب ورود وارد شوید.");
                 txtUsername.setText("");

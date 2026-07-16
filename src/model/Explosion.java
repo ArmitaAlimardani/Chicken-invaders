@@ -31,9 +31,8 @@ public class Explosion {
         if (holdTime < 10) {
             holdTime++;
         } else {
-            // مرحله دوم: شروع به محو شدن
             if (alpha > 20) {
-                alpha -= 15; // سرعت محو شدن را کمتر کردیم تا طولانی‌تر بماند
+                alpha -= 15;
             } else {
                 active = false;
             }
@@ -43,7 +42,6 @@ public class Explosion {
     public void draw(Graphics2D g2d) {
         if (!active) return;
 
-        // اعمال شفافیت برای محو شدن تصویر
         g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha / 255f));
 
         if (explosionImage != null) {

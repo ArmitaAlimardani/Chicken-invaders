@@ -8,13 +8,11 @@ import java.util.ArrayList;
 public class BossLevel8 extends Boss {
     private double angleMovement = 0;
     private long lastShotTime = 0;
-    private final long shotInterval = 1000; // ۱ ثانیه
+    private final long shotInterval = 1000;
 
     public BossLevel8(int x, int y) {
-        // ۱۰۰ جان، ابعاد بزرگتر ۱۸۰ در ۱۸۰
         super(x, y, 3, 2, 100, 180, 180);
 
-        // 🛠️ اصلاح نام فایل به boss2.png و تغییر بک‌اسلش به اسلش استاندارد
         ImageIcon icon = new ImageIcon("icon/boss2.png");
         Image rawImage = icon.getImage();
         if (rawImage != null) {
@@ -24,13 +22,11 @@ public class BossLevel8 extends Boss {
 
     @Override
     public void update() {
-        // حرکت افقی با سرعت مبنا
         x += speedX;
         if (x < 10 || x > 800 - width - 10) {
             speedX *= -1;
         }
 
-        // حرکت نوسانی در محدوده ۱۰۰ پیکسل عمودی (بند ۴.۴)
         angleMovement += 0.04;
         y = 60 + (int) (Math.sin(angleMovement) * 45);
     }
@@ -39,11 +35,9 @@ public class BossLevel8 extends Boss {
     public void updateAttack(ArrayList<Egg> eggs) {
         long now = System.currentTimeMillis();
         if (now - lastShotTime > shotInterval) {
-            // شلیک دقیقاً از مرکز پایینی غول نهایی
             int centerX = x + width / 2;
             int centerY = y + height;
 
-            // شلیک ۸ جهته با سرعت ۵ پیکسل/فریم طبق داکیومنت
             int[] angles = {0, 45, 90, 135, 180, 225, 270, 315};
             for (int angle : angles) {
                 eggs.add(new Egg(centerX, centerY, 5, angle));
@@ -57,7 +51,6 @@ public class BossLevel8 extends Boss {
         if (bossImage != null && bossImage.getWidth(null) > 0) {
             g2d.drawImage(bossImage, x, y, null);
         } else {
-            // 🧪 جهت خطایابی: اگر عکس لود نشد، دور مربع صورتی یک کادر قرمز می‌کشد تا متوجه شویم مسیر فایل ایراد دارد
             g2d.setColor(Color.MAGENTA);
             g2d.fillRect(x, y, width, height);
             g2d.setColor(Color.RED);

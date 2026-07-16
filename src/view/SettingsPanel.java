@@ -17,14 +17,14 @@ public class SettingsPanel extends JPanel {
         setLayout(new BorderLayout());
         setBackground(Color.BLACK);
 
-        // ۱. عنوان صفحه
+        // عنوان صفحه
         JLabel titleLabel = new JLabel(" تنظیمات صدای بازی ️", JLabel.CENTER);
         titleLabel.setForeground(Color.CYAN);
         titleLabel.setFont(new Font("Arial", Font.BOLD, 26));
         titleLabel.setBorder(BorderFactory.createEmptyBorder(20, 0, 20, 0));
         add(titleLabel, BorderLayout.NORTH);
 
-        // ۲. پنل چک‌باکس‌ها
+        // پنل چک‌باکس‌ها
         JPanel centerPanel = new JPanel(new GridLayout(4, 1, 15, 15));
         centerPanel.setBackground(Color.BLACK);
         centerPanel.setBorder(BorderFactory.createEmptyBorder(10, 50, 10, 50));
@@ -40,7 +40,7 @@ public class SettingsPanel extends JPanel {
         centerPanel.add(chkGameOver);
         add(centerPanel, BorderLayout.CENTER);
 
-        // ۳. دکمه ذخیره و بازگشت
+        // دکمه ذخیره و بازگشت
         JButton btnSave = new JButton("ذخیره و بازگشت");
         btnSave.setFont(new Font("Arial", Font.BOLD, 16));
         btnSave.setBackground(Color.DARK_GRAY);
@@ -78,14 +78,12 @@ public class SettingsPanel extends JPanel {
 
     private void loadCurrentSettings() {
         if (UserSession.isLoggedIn()) {
-            // دریافت آرایه وضعیت‌ها از ۴ ستون دیتابیس
             int[] sounds = DatabaseManager.getSoundSettings(UserSession.getUsername());
             chkMusic.setSelected(sounds[0] == 1);
             chkShot.setSelected(sounds[1] == 1);
             chkCollision.setSelected(sounds[2] == 1);
             chkGameOver.setSelected(sounds[3] == 1);
         } else {
-            // اگر کاربری وارد نشده بود، همه تیک‌ها روشن باشند
             chkMusic.setSelected(true);
             chkShot.setSelected(true);
             chkCollision.setSelected(true);
@@ -100,11 +98,9 @@ public class SettingsPanel extends JPanel {
         int g = chkGameOver.isSelected() ? 1 : 0;
 
         if (UserSession.isLoggedIn()) {
-            // ذخیره مستقیم در ۴ ستون تفکیک‌شده
             DatabaseManager.updateSoundSettings(UserSession.getUsername(), m, s, c, g);
         }
 
-        // فرستادن وضعیت به منیجر برای اعمال آنی صداها
         String formatStr = m + "," + s + "," + c + "," + g;
         controller.SoundManager.updateSettings(formatStr);
     }

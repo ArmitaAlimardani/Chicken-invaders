@@ -5,7 +5,7 @@ import java.awt.*;
 
 public class Bullet {
     private int x, y;
-    private int width = 45; // ابعاد جدید بر اساس تصویر
+    private int width = 45;
     private int height = 45;
     private int speed = 8;
     private boolean active = true;
@@ -14,7 +14,6 @@ public class Bullet {
     public Bullet(int x, int y) {
         this.x = x - (this.width / 2);
         this.y = y;
-        // لود کردن عکس شات
         this.bulletImage = new ImageIcon("icon\\shot.png").getImage();
     }
 

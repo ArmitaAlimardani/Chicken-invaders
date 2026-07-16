@@ -18,16 +18,14 @@ public class GridManager {
     private ArrayList<Egg> eggs;
     private int currentLevel;
 
-    // پارامترهای مرحله طبق جدول صورت پروژه
     private double speedX;
     private int stepY;
-    private long eggDropInterval; // به میلی‌ثانیه
+    private long eggDropInterval;
     private int initialCellLives;
 
-    private int direction = 1; // ۱ راست، ۱- چپ
+    private int direction = 1;
     private long lastEggDropTime = 0;
 
-    // فیلد چندریختی برای نگهداری غول‌های مرحله ۴ و ۸
     private Boss currentBoss = null;
 
     public GridManager(int level, ArrayList<Enemy> activeEnemies, ArrayList<Egg> eggs) {
@@ -38,7 +36,6 @@ public class GridManager {
         setupGrid();
     }
 
-    // تنظیم دقیق پارامترها از روی جدول پروژه (مراحل ۱ تا ۸)
     private void initLevelParameters() {
         switch (currentLevel) {
             case 1:
@@ -50,7 +47,7 @@ public class GridManager {
             case 3:
                 speedX = 2.0; stepY = 25; eggDropInterval = 1500; initialCellLives = 3;
                 break;
-            case 4: // غول میانی (پارامتر شلیک افکت داخلی دارد اما بیس ذخیره می‌شود)
+            case 4:
                 speedX = 1.5; stepY = 0;  eggDropInterval = 1500; initialCellLives = 1;
                 break;
             case 5:
@@ -70,13 +67,10 @@ public class GridManager {
         }
     }
 
-    // چیدن مرغ‌ها یا غول‌ها متناسب با مرحله بازی
     private void setupGrid() {
-        // ⬇️ خیلی مهم: این خط باعث میشه لیست اصلی توی GamePanel هم کاملاً پاک بشه
         activeEnemies.clear();
         currentBoss = null;
 
-        // مدیریت مراحل غول (بند ۴.۴)
         if (currentLevel == 4) {
             currentBoss = new BossLevel4(330, 50);
             activeEnemies.add(currentBoss);
@@ -88,7 +82,6 @@ public class GridManager {
             return;
         }
 
-        // چیدن ماتریس ۵ در ۸ برای مراحل معمولی (۱، ۲، ۳، ۵، ۶، ۷)
         int startX = 80;
         int startY = 50;
         int hGap = 70;
@@ -104,32 +97,30 @@ public class GridManager {
                 Enemy enemy = createEnemyForLevel(cellX, cellY);
                 grid[r][c].setCurrentEnemy(enemy);
 
-                // ⬇️ مرغ‌های جدید لول بعدی مستقیماً به لیست بازی فرستاده می‌شوند
                 activeEnemies.add(enemy);
             }
         }
     }
 
-    // تولید اختصاصی تنوع مرغ‌ها بر اساس جدول "نوع دشمنان غالب" صورت پروژه
     private Enemy createEnemyForLevel(int x, int y) {
         double rand = Math.random();
 
         switch (currentLevel) {
             case 1:
                 return new NormalEnemy(x, y, currentLevel);
-            case 2: // ترکیب نرمال و سریع
+            case 2:
                 if (rand > 0.6) return new FastEnemy(x, y, currentLevel);
                 return new NormalEnemy(x, y, currentLevel);
-            case 3: // ترکیب نرمال و زیگزاگ
+            case 3:
                 if (rand > 0.5) return new ZigzagEnemy(x, y, currentLevel);
                 return new NormalEnemy(x, y, currentLevel);
-            case 5: // ترکیب شوتینگ و سریع
+            case 5:
                 if (rand > 0.5) return new ShooterEnemy(x, y, currentLevel);
                 return new FastEnemy(x, y, currentLevel);
-            case 6: // ترکیب زیگزاگ و شوتینگ
+            case 6:
                 if (rand > 0.5) return new ZigzagEnemy(x, y, currentLevel);
                 return new ShooterEnemy(x, y, currentLevel);
-            case 7: // همه انواع به صورت کاملاً رندوم
+            case 7:
                 if (rand < 0.25) return new NormalEnemy(x, y, currentLevel);
                 else if (rand < 0.5) return new FastEnemy(x, y, currentLevel);
                 else if (rand < 0.75) return new ZigzagEnemy(x, y, currentLevel);
@@ -139,15 +130,12 @@ public class GridManager {
         }
     }
 
-    // به‌روزرسانی هوشمند فریم‌ها بر اساس نوع لول (شبکه‌ای یا غول)
     public void update() {
-        // اگر تمام دشمنان نابود شده باشند، برو مرحله بعد
         if (activeEnemies.isEmpty()) {
             advanceLevel();
             return;
         }
 
-        // مدیریت لول‌های غول
         if (currentLevel == 4 || currentLevel == 8) {
             if (currentBoss != null && currentBoss.isActive()) {
                 currentBoss.update();
@@ -156,7 +144,6 @@ public class GridManager {
             return;
         }
 
-        // حرکت تیمی شبکه مرغ‌های معمولی
         boolean hitEdge = false;
         int currentShift = (int)(speedX * direction);
 
@@ -187,12 +174,10 @@ public class GridManager {
             }
         }
 
-        // 🛑 [بخش جدید: راه حل دوم] بررسی رسیدن کل گله به پایین صفحه
         boolean networkReachedBottom = false;
         for (int r = 0; r < 5; r++) {
             for (int c = 0; c < 8; c++) {
                 Cell cell = grid[r][c];
-                // اگر سلول زنده است و موقعیت تارگت Y آن از حد مجاز (مثلاً 430 پیکسل) عبور کرده
                 if (cell != null && cell.getCellLives() > 0 && cell.getTargetY() > 430) {
                     networkReachedBottom = true;
                     break;
@@ -200,13 +185,12 @@ public class GridManager {
             }
         }
 
-        // اگر گله مرغ‌ها به کف صفحه نزدیک شد، کل ماتریس شبکه را به بالا ریست کن
         if (networkReachedBottom) {
             int startX = 80;
-            int startY = 50; // بازگشت به Y سقف
+            int startY = 50;
             int hGap = 70;
             int vGap = 65;
-            direction = 1; // ریست کردن جهت حرکت افقی به سمت راست
+            direction = 1;
 
             for (int r = 0; r < 5; r++) {
                 for (int c = 0; c < 8; c++) {
@@ -215,14 +199,11 @@ public class GridManager {
                         int targetNewX = startX + (c * hGap);
                         int targetNewY = startY + (r * vGap);
 
-                        // محاسبه میزان جابه‌جایی لازم برای ریست فیزیکی سلول به مختصات اولیه بالا
                         int diffX = targetNewX - cell.getTargetX();
                         int diffY = targetNewY - cell.getTargetY();
 
-                        // انتقال هماهنگ سلول شبکه
                         cell.updatePosition(diffX, diffY);
 
-                        // اگر مرغ زنده درون این سلول است، مختصات فیزیکی و تارگت مرغ را هم فورا بالا ببر
                         Enemy enemy = cell.getCurrentEnemy();
                         if (enemy != null) {
                             enemy.x = targetNewX;
@@ -235,10 +216,8 @@ public class GridManager {
                 }
             }
             System.out.println("⚠️ Warning: Chickens invaded the bottom! Grid reset to top.");
-            // جریمه کم شدن جان هواپیما به دلیل کپسوله‌سازی کامل در متد updateGame کلاس GamePanel مدیریت می‌شود.
         }
 
-        // شلیک تخم‌مرغ توسط مرغ‌ها در زمان مشخص شده
         long now = System.currentTimeMillis();
         if (now - lastEggDropTime > eggDropInterval) {
             shootEggFromRandomChicken();
@@ -249,7 +228,6 @@ public class GridManager {
     private void shootEggFromRandomChicken() {
         if (activeEnemies.isEmpty()) return;
 
-        // فیلتر کردن مرغ‌هایی که در حال پرواز به خانه شبکه نیستند برای شلیک منطقی
         ArrayList<Enemy> readyToShoot = new ArrayList<>();
         for (Enemy e : activeEnemies) {
             if (!e.isMovingToTarget) {
@@ -262,17 +240,13 @@ public class GridManager {
         int index = (int)(Math.random() * readyToShoot.size());
         Enemy shooter = readyToShoot.get(index);
 
-        // شلیک تخم‌مرغ عمودی (سرعت ۴، زاویه ۹۰) طبق بند ۴.۵
         eggs.add(new Egg(shooter.getX() + 20, shooter.getY() + 45, 4, 90));
 
-        // اگر دشمن شلیک‌کننده (ShooterEnemy) بود، علاوه بر تخم عمودی شلیک افقی هم می‌کند
-        if (shooter instanceof ShooterEnemy) {
-            // شلیک افقی به چپ یا راست بر اساس مکان هواپیما (یا ساده به راست با سرعت ۵)
+        if (shooter instanceof ShooterEnemy)
             eggs.add(new Egg(shooter.getX(), shooter.getY() + 20, 5, 0));
-        }
+
     }
 
-    // مدیریت مرگ مرغ‌ها و شبیه‌سازی مکانیزم پرواز جایگزین
     public void handleEnemyDeath(Enemy deadEnemy) {
         if (currentLevel == 4 || currentLevel == 8) {
             if (deadEnemy == currentBoss) {
@@ -303,7 +277,6 @@ public class GridManager {
         }
     }
 
-    // هدایت اتوماتیک بازی به لول بالاتر
     private void advanceLevel() {
         if (currentLevel < 8) {
             currentLevel++;
@@ -312,20 +285,16 @@ public class GridManager {
             System.out.println("Advanced to Level " + currentLevel);
         } else {
             System.out.println("Victory! Game Completed.");
-            // این فاز در GamePanel هندل پیروزی نهایی را فعال می‌کند.
         }
     }
 
-    //  متد اختصاصی برای تنظیم مجدد لول و چیدمان شبکه مرغ‌ها در زمان ری‌استارت بازی
     public void resetToLevel(int level) {
         this.currentLevel = level;
-        this.direction = 1;            // ریست کردن جهت حرکت شبکه به سمت راست
-        this.lastEggDropTime = 0;       // ریست کردن زمان‌سنج شلیک تخم‌مرغ‌ها
+        this.direction = 1;
+        this.lastEggDropTime = 0;
 
-        // ۱. مقداردهی مجدد پارامترهای سرعت و جان مرغ‌ها بر اساس لول جدید (لول ۱)
         initLevelParameters();
 
-        // ۲. خالی کردن لیست غول‌ها و بازسازی ماتریس ۵ در ۸ مرغ‌ها از سقف
         setupGrid();
 
         System.out.println("GridManager successfully reset to Level " + level);
