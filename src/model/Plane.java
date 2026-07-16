@@ -1,133 +1,185 @@
 package model;
 
-import view.GamePanel;
-
 import javax.swing.*;
 import java.awt.*;
 
-
 public class Plane {
-    private int x, y;
-    private int width = 85;
-    private int height = 85;
 
-    private int dx, dy;
+    private static final int PANEL_WIDTH = 800;
+    private static final int PANEL_HEIGHT = 600;
 
-    private int fireLevel = 1;
+    private static final int PLANE_WIDTH = 85;
+    private static final int PLANE_HEIGHT = 85;
 
-    private long lastShotTime = 0;
-    private long rapidFireEndTime = 0;
+    private static final int DEFAULT_FIRE_LEVEL = 1;
+    private static final int MAX_FIRE_LEVEL = 10;
 
-    private long shieldEndTime = 0;
+    private static final int MAX_LIVES = 5;
 
-    private Image planeImage;
+    private static final int RAPID_FIRE_DURATION_SECONDS = 8;
+    private static final int SHIELD_DURATION_SECONDS = 10;
+
+    private static final int MILLISECONDS_PER_SECOND = 1_000;
+
+    private static final int SHIELD_PADDING = 15;
+    private static final int DEFAULT_PLANE_HEAD_SIZE = 10;
+
+    private int x;
+    private int y;
+
+    private int dx;
+    private int dy;
+
+    private final int width = PLANE_WIDTH;
+    private final int height = PLANE_HEIGHT;
 
     private int speed;
     private int lives;
-    private long baseShotCooldown;
+    private int fireLevel = DEFAULT_FIRE_LEVEL;
 
-    public void loadStats(String planeName) {
-        switch (planeName) {
-            case "Fast":
-                this.speed = 7;
-                this.lives = 3;
-                this.baseShotCooldown = 250;
-                break;
-            case "Heavy":
-                this.speed = 4;
-                this.lives = 5;
-                this.baseShotCooldown = 200;
-                break;
-            case "Sniper":
-                this.speed = 5;
-                this.lives = 3;
-                this.baseShotCooldown = 150;
-                break;
-            default:
-                this.speed = 5;
-                this.lives = 3;
-                this.baseShotCooldown = 300;
-                break;
-        }
-    }
+    private long baseShotCooldown;
+    private long lastShotTime;
+
+    private long rapidFireEndTime;
+    private long shieldEndTime;
+
+    private Image planeImage;
 
     public Plane(int x, int y, String planeName) {
         this.x = x;
         this.y = y;
 
-        this.planeImage = new ImageIcon("icon/" + planeName + ".png").getImage();
+        loadPlaneImage(planeName);
         loadStats(planeName);
-
     }
 
+    private void loadPlaneImage(String planeName) {
+        planeImage = new ImageIcon("icon/" + planeName + ".png").getImage();
+    }
 
-    public void setLives(int lives) { this.lives = lives; }
+    public void loadStats(String planeName) {
+        switch (planeName) {
+            case "Fast":
+                configureStats(7, 3, 250);
+                break;
+
+            case "Heavy":
+                configureStats(4, 5, 200);
+                break;
+
+            case "Sniper":
+                configureStats(5, 3, 150);
+                break;
+
+            default:
+                configureStats(5, 3, 300);
+                break;
+        }
+    }
+
+    private void configureStats(int speed, int lives, long shotCooldown) {
+        this.speed = speed;
+        this.lives = lives;
+        this.baseShotCooldown = shotCooldown;
+    }
 
     public void update() {
         x += dx;
         y += dy;
 
-        if (x < 0) x = 0;
-        if (x > 800 - width) x = 800 - width;
-        if (y < 0) y = 0;
-        if (y > 600 - height) y = 600 - height;
+        keepInsidePanel();
+    }
+
+    private void keepInsidePanel() {
+        x = Math.max(0, Math.min(x, PANEL_WIDTH - width));
+        y = Math.max(0, Math.min(y, PANEL_HEIGHT - height));
     }
 
     public void draw(Graphics2D g2d) {
-        if (isShieldActive()) {
-            g2d.setColor(new Color(0, 191, 255, 100));
-            g2d.fillOval(x - 15, y - 15, width + 30, height + 30);
-            g2d.setColor(Color.CYAN);
-            g2d.drawOval(x - 15, y - 15, width + 30, height + 30);
+        drawShield(g2d);
+        drawPlane(g2d);
+    }
+
+    private void drawShield(Graphics2D g2d) {
+        if (!isShieldActive()) {
+            return;
         }
 
+        g2d.setColor(new Color(0, 191, 255, 100));
+        g2d.fillOval(x - SHIELD_PADDING, y - SHIELD_PADDING, width + SHIELD_PADDING * 2, height + SHIELD_PADDING * 2);
+
+        g2d.setColor(Color.CYAN);
+        g2d.drawOval(x - SHIELD_PADDING, y - SHIELD_PADDING, width + SHIELD_PADDING * 2, height + SHIELD_PADDING * 2);
+    }
+
+    private void drawPlane(Graphics2D g2d) {
         if (planeImage != null) {
             g2d.drawImage(planeImage, x, y, width, height, null);
-        } else {
-            g2d.setColor(Color.GREEN);
-            g2d.fillRect(x, y, width, height);
-            g2d.setColor(Color.WHITE);
-            g2d.fillOval(x + width / 2 - 5, y - 5, 10, 10);
+
+            return;
         }
+
+        drawDefaultPlane(g2d);
+    }
+
+    private void drawDefaultPlane(Graphics2D g2d) {
+        g2d.setColor(Color.GREEN);
+        g2d.fillRect(x, y, width, height);
+
+        int headX = x + width / 2 - DEFAULT_PLANE_HEAD_SIZE / 2;
+        int headY = y - DEFAULT_PLANE_HEAD_SIZE / 2;
+
+        g2d.setColor(Color.WHITE);
+        g2d.fillOval(headX, headY, DEFAULT_PLANE_HEAD_SIZE, DEFAULT_PLANE_HEAD_SIZE);
     }
 
     public boolean canShoot() {
         long currentTime = System.currentTimeMillis();
-        long currentCooldown = isRapidFireActive() ? (baseShotCooldown / 2) : baseShotCooldown;
+        long currentCooldown = getCurrentShotCooldown();
 
-        if (currentTime - lastShotTime >= currentCooldown) {
-            lastShotTime = currentTime;
-            return true;
+        if (currentTime - lastShotTime < currentCooldown) {
+            return false;
         }
-        return false;
+
+        lastShotTime = currentTime;
+        return true;
     }
 
-    public void shootMock() {
-        int centerX = this.x + (this.width / 2);
-        int centerY = this.y;
-        System.out.println("تیر شلیک شد! مختصات نوک سفینه: (" + centerX + ", " + centerY + ") - سطح تیر: " + fireLevel);
+    private long getCurrentShotCooldown() {
+        if (isRapidFireActive()) {
+            return baseShotCooldown / 2;
+        }
+
+        return baseShotCooldown;
     }
 
     public void loseLife() {
-        if (!isShieldActive()) {
-            lives--;
+        if (isShieldActive()) {
+            return;
         }
-    }
 
-    public void activateShield(int durationSeconds) {
-        shieldEndTime = System.currentTimeMillis() + (durationSeconds * 1000L);
-    }
-
-    public void activatePremiumRapidFire(int durationSeconds) {
-        rapidFireEndTime = System.currentTimeMillis() + (durationSeconds * 1000L);
+        lives = Math.max(0, lives - 1);
     }
 
     public void addLife() {
-        if (lives < 5) lives++; // سقف ۵ جان طبق صورت پروژه
+        lives = Math.min(lives + 1, MAX_LIVES);
     }
 
-    public void incrementFireLevel() {
-        fireLevel++;
+    public void increaseFireLevel() {
+        fireLevel = Math.min(fireLevel + 1, MAX_FIRE_LEVEL);
+    }
+
+    public void activateShield(int durationSeconds) {
+        shieldEndTime = calculateEffectEndTime(durationSeconds);
+    }
+
+    public void activateRapidFire(int durationSeconds) {
+        rapidFireEndTime = calculateEffectEndTime(durationSeconds);
+    }
+
+    private long calculateEffectEndTime(int durationSeconds) {
+        int validDuration = Math.max(0, durationSeconds);
+        return System.currentTimeMillis() + validDuration * MILLISECONDS_PER_SECOND;
     }
 
     public boolean isShieldActive() {
@@ -138,34 +190,28 @@ public class Plane {
         return System.currentTimeMillis() < rapidFireEndTime;
     }
 
-    public void setDx(int dx) { this.dx = dx; }
-    public void setDy(int dy) { this.dy = dy; }
-    public int getX() { return x; }
-    public int getY() { return y; }
-    public int getWidth() { return width; }
-    public int getHeight() { return height; }
-    public int getSpeed() { return speed; }
-    public int getLives() { return lives; }
-    public int getFireLevel() { return fireLevel; }
-
-    public Rectangle getBounds() {
-        return new Rectangle(x, y, width, height);
-    }
-
     public void applyPowerUp(PowerUpType type) {
+        if (type == null) {
+            return;
+        }
+
         switch (type) {
             case ADD_FIRE:
-                incrementFireLevel();
+                increaseFireLevel();
                 break;
+
             case RAPID_FIRE:
-                activatePremiumRapidFire(8);
+                activateRapidFire(RAPID_FIRE_DURATION_SECONDS);
                 break;
+
             case EXTRA_LIFE:
                 addLife();
                 break;
+
             case SHIELD:
-                activateShield(10);
+                activateShield(SHIELD_DURATION_SECONDS);
                 break;
+
             case FREEZE_BOMB:
                 break;
         }
@@ -174,11 +220,63 @@ public class Plane {
     public void setLocation(int x, int y) {
         this.x = x;
         this.y = y;
-        this.dx = 0;
-        this.dy = 0;
+
+        stopMoving();
+        keepInsidePanel();
     }
 
+    public void stopMoving() {
+        dx = 0;
+        dy = 0;
+    }
+
+    public void resetFireLevel() {
+        fireLevel = DEFAULT_FIRE_LEVEL;
+    }
+
+    public Rectangle getBounds() {
+        return new Rectangle(x, y, width, height);
+    }
+
+    public void shootMock() {
+        int centerX = x + width / 2;
+        int centerY = y;
+
+        System.out.println("تیر شلیک شد! مختصات نوک سفینه: (" + centerX + ", " + centerY + ") - سطح تیر: " + fireLevel);
+    }
+
+    public void setDx(int dx) {
+        this.dx = dx;
+    }
+    public void setDy(int dy) {
+        this.dy = dy;
+    }
+    public void setLives(int lives) {
+        this.lives = Math.max(0, Math.min(lives, MAX_LIVES));
+    }
     public void setFireLevel(int fireLevel) {
-        this.fireLevel = fireLevel;
+        this.fireLevel = Math.max(DEFAULT_FIRE_LEVEL, Math.min(fireLevel, MAX_FIRE_LEVEL));
+    }
+
+    public int getX() {
+        return x;
+    }
+    public int getY() {
+        return y;
+    }
+    public int getWidth() {
+        return width;
+    }
+    public int getHeight() {
+        return height;
+    }
+    public int getSpeed() {
+        return speed;
+    }
+    public int getLives() {
+        return lives;
+    }
+    public int getFireLevel() {
+        return fireLevel;
     }
 }

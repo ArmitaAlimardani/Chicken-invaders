@@ -3,9 +3,10 @@ package view;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
-import model.Plane;
-import model.PowerUp;
-import model.PowerUpType;
+import java.util.ArrayList;
+
+import controller.SoundManager;
+import model.*;
 import model.enemy.Boss;
 import model.enemy.Enemy;
 
@@ -13,109 +14,106 @@ import model.database.DatabaseManager;
 import model.database.UserSession;
 
 public class GamePanel extends JPanel implements ActionListener, KeyListener {
-    private Timer gameTimer;
-    private Plane plane;
-    private boolean isPaused = false;
-    private int score = 0;
-    private int currentLevel = 1;
-    private boolean scoreSaved = false;
+    private static final int PANEL_WIDTH = 800;
+    private static final int PANEL_HEIGHT = 600;
+    private static final int FRAME_DELAY_MS = 16;
+    private static final int BACKGROUND_SCROLL_SPEED = 2;
 
-    private boolean isVictory = false;
+    private static final int START_LEVEL = 1;
+    private static final int MID_BOSS_LEVEL = 4;
+    private static final int FINAL_BOSS_LEVEL = 8;
 
-    private MainMenu mainMenu;
+    private static final int NORMAL_LEVEL_BONUS = 200;
+    private static final int MID_BOSS_BONUS = 500;
+    private static final int FINAL_BOSS_BONUS = 1000;
+
+    private static final int FREEZE_DURATION_MS = 3_000;
+    private static final int LIFE_MESSAGE_DURATION_MS = 1_500;
+    private static final double POWER_UP_DROP_CHANCE = 0.20;
+    private static final int BULLET_SPACING = 25;
+
+    private static final String BACKGROUND_PATH = "icon/background.jpg";
+    private static final String SOUND_SETTINGS_SNAPSHOT = "ON";
+
+    private final MainMenu mainMenu;
+    private final Timer gameTimer;
+    private final Plane plane;
+    private final GridManager gridManager;
+
+    private final ArrayList<Bullet> bullets = new ArrayList<>();
+    private final ArrayList<Enemy> enemies = new ArrayList<>();
+    private final ArrayList<Egg> eggs = new ArrayList<>();
+    private final ArrayList<PowerUp> powerUps = new ArrayList<>();
+    private final ArrayList<Explosion> explosions = new ArrayList<>();
 
     private Image backgroundImage;
-    private int backgroundY = 0;
+    private int backgroundY;
+    private int score;
+    private int currentLevel = START_LEVEL;
 
+    private boolean paused;
+    private boolean victory;
+    private boolean scoreSaved;
+    private boolean frozen;
+    private long freezeEndTime;
 
-    private boolean showLifeGainedMessage = false;
-    private long lifeMessageEndTime = 0;
-
-    private java.util.ArrayList<model.Bullet> bullets = new java.util.ArrayList<>();
-    private java.util.ArrayList<Enemy> enemies = new java.util.ArrayList<>();
-    private java.util.ArrayList<model.Egg> eggs = new java.util.ArrayList<>();
-
-    private java.util.ArrayList<PowerUp> powerUps = new java.util.ArrayList<>();
-
-    private model.GridManager gridManager;
-
-    private java.util.ArrayList<model.Explosion> explosions = new java.util.ArrayList<>();
-
-    private boolean isFrozen = false;
-    private long freezeEndTime = 0;
+    private boolean showLifeGainedMessage;
+    private long lifeMessageEndTime;
 
     public GamePanel(MainMenu mainMenu) {
         this.mainMenu = mainMenu;
+        configurePanel();
+        loadBackgroundImage();
 
-        setPreferredSize(new Dimension(800, 600));
+        plane = new Plane(362, 480, GameConfig.activePlaneName);
+        gridManager = new GridManager(currentLevel, enemies, eggs);
+
+        configureKeyBindings();
+
+        gameTimer = new Timer(FRAME_DELAY_MS, this);
+        gameTimer.start();
+    }
+
+    private void configurePanel() {
+        setPreferredSize(new Dimension(PANEL_WIDTH, PANEL_HEIGHT));
         setBackground(Color.BLACK);
         setFocusable(true);
         addKeyListener(this);
+    }
 
-        ImageIcon bgIcon = new ImageIcon("icon\\background.jpg");
-        if (bgIcon.getImageLoadStatus() == MediaTracker.COMPLETE) {
-            this.backgroundImage = bgIcon.getImage().getScaledInstance(800, 600, Image.SCALE_SMOOTH);
+    private void loadBackgroundImage() {
+        ImageIcon backgroundIcon = new ImageIcon(BACKGROUND_PATH);
+        if (backgroundIcon.getImageLoadStatus() == MediaTracker.COMPLETE) {
+            backgroundImage = backgroundIcon.getImage().getScaledInstance(
+                    PANEL_WIDTH,
+                    PANEL_HEIGHT,
+                    Image.SCALE_SMOOTH
+            );
         }
+    }
 
-        gridManager = new model.GridManager(currentLevel, enemies, eggs);
-
-        gameTimer = new Timer(16, this);
-        gameTimer.start();
-
-        this.getInputMap(javax.swing.JComponent.WHEN_IN_FOCUSED_WINDOW)
-                .put(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ENTER, 0), "returnToMenu");
-
-        this.getActionMap().put("returnToMenu", new javax.swing.AbstractAction() {
-            @Override
-            public void actionPerformed(java.awt.event.ActionEvent e) {
-                if (isVictory) {
-                    Window topFrame = SwingUtilities.getWindowAncestor(GamePanel.this);
-                    if (topFrame != null) {
-                        topFrame.dispose();
-                    }
-
-                    controller.SoundManager.playBackgroundMusic();
-
-                    if (GamePanel.this.mainMenu != null) {
-                        GamePanel.this.mainMenu.setVisible(true);
-                    }
-                }
+    private void configureKeyBindings() {
+        bindKey(KeyEvent.VK_ESCAPE, "returnToMenu", this::returnToMainMenu);
+        bindKey(KeyEvent.VK_ENTER, "returnAfterGame", () -> {
+            if (isGameFinished()) {
+                returnToMainMenu();
             }
         });
+    }
 
-        this.getInputMap(javax.swing.JComponent.WHEN_IN_FOCUSED_WINDOW)
-                .put(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ESCAPE, 0), "returnToMenuOnGameOver");
-
-        this.getInputMap(javax.swing.JComponent.WHEN_IN_FOCUSED_WINDOW)
-                .put(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ENTER, 0), "returnToMenuOnGameOver");
-
-        this.getActionMap().put("returnToMenuOnGameOver", new javax.swing.AbstractAction() {
+    private void bindKey(int keyCode, String actionName, Runnable action) {
+        getInputMap(WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(keyCode, 0), actionName);
+        getActionMap().put(actionName, new AbstractAction() {
             @Override
-            public void actionPerformed(java.awt.event.ActionEvent e) {
-                if (plane.getLives() <= 0) {
-                    java.awt.Window topFrame = javax.swing.SwingUtilities.getWindowAncestor(GamePanel.this);
-                    if (topFrame != null) {
-                        topFrame.dispose();
-                    }
-
-                    controller.SoundManager.playBackgroundMusic();
-
-                    if (GamePanel.this.mainMenu != null) {
-                        GamePanel.this.mainMenu.setVisible(true);
-                    }
-                }
+            public void actionPerformed(ActionEvent event) {
+                action.run();
             }
         });
-
-        //chooing plane
-        String selectedPlane = model.GameConfig.activePlaneName;
-        this.plane = new Plane(362, 480, selectedPlane);
-
     }
 
     @Override
-    public void actionPerformed(ActionEvent e) {
-        if (!isPaused) {
+    public void actionPerformed(ActionEvent event) {
+        if (!paused) {
             updateGame();
         }
         repaint();
@@ -123,584 +121,606 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
 
     private void updateGame() {
         if (plane.getLives() <= 0) {
-            gameTimer.stop();
-
-            controller.SoundManager.stopBackgroundMusic();
-            controller.SoundManager.playGameOverSound();
-
-            if (!scoreSaved && UserSession.isLoggedIn()) {
-                int finalLvl = gridManager.getCurrentLevel();
-                DatabaseManager.saveGameRecord(UserSession.getUsername(), score, finalLvl, "ON");
-                scoreSaved = true;
-                System.out.println(" Game Over record saved into database!");
-            }
-
-            SwingUtilities.invokeLater(() -> {
-                JOptionPane.showMessageDialog(this, "بازی تمام شد!\nامتیاز نهایی شما: " + score, "Game Over", JOptionPane.ERROR_MESSAGE);
-            });
+            finishGame(false);
             return;
         }
 
-        if (!plane.isShieldActive()) {
-            for (int i = 0; i < enemies.size(); i++) {
-                Enemy enemy = enemies.get(i);
+        updateBackground();
+        updatePlane();
+        updateFreezeState();
+        updateEnemiesAndGrid();
+        updateProjectiles();
+        updatePowerUps();
+        updateExplosions();
 
-                if (plane.getBounds().intersects(enemy.getBounds())) {
-                    plane.setLives(plane.getLives() - 1);
+        handlePlaneEnemyCollisions();
+        handleBulletEnemyCollisions();
+        handleEggPlaneCollisions();
+        handlePlanePowerUpCollisions();
 
-                    controller.SoundManager.playCollisionSound();
+        updateLifeMessageState();
+        checkFinalVictory();
+    }
 
-                    explosions.add(new model.Explosion(
-                            plane.getX() + (plane.getWidth() / 2),
-                            plane.getY() + (plane.getHeight() / 2),
-                            Color.RED));
+    private void updateBackground() {
+        backgroundY = (backgroundY + BACKGROUND_SCROLL_SPEED) % PANEL_HEIGHT;
+    }
 
-                    enemies.remove(i);
-                    i--;
-                }
-            }
-        }
-
-        //  حرکت دادن موقعیت پس‌زمینه
-        if (!isPaused) {
-            backgroundY += 2;
-            if (backgroundY >= 600) {
-                backgroundY = 0;
-            }
-        }
-
+    private void updatePlane() {
         plane.update();
+    }
 
-        long now = System.currentTimeMillis();
-        if (isFrozen && now > freezeEndTime) {
-            isFrozen = false;
-        }
-
-        // ۱. آپدیت شبکهٔ مرغ‌ها و غول‌ها
-        if (!isFrozen) {
-            gridManager.update();
-
-            for (Enemy enemy : enemies) {
-                if (enemy instanceof Boss) {
-                    ((Boss) enemy).updateAttack(eggs);
-                }
-            }
-        }
-
-        int oldLevel = this.currentLevel;
-        this.currentLevel = gridManager.getCurrentLevel();
-
-        if (this.currentLevel > oldLevel && oldLevel != 4 && oldLevel != 8) {
-            score += 200;
-            System.out.println("🎉 +200 Clearance Bonus for Level " + oldLevel);
-        }
-
-        // ۲. آپدیت گلوله‌های هواپیما
-        for (int i = 0; i < bullets.size(); i++) {
-            model.Bullet b = bullets.get(i);
-            b.update();
-            if (!b.isActive()) {
-                bullets.remove(i);
-                i--;
-            }
-        }
-
-        // ۳. آپدیت وضعیت تک‌تک مرغ‌ها
-        if (!isFrozen) {
-            for (int i = 0; i < enemies.size(); i++) {
-                Enemy enemy = enemies.get(i);
-                enemy.update();
-
-                if (enemy.y > 500) {
-                    if (!plane.isShieldActive()) {
-                        plane.setLives(plane.getLives() - 1);
-
-                        controller.SoundManager.playCollisionSound();
-
-                        explosions.add(new model.Explosion(plane.getX() + (plane.getWidth() / 2), plane.getY() + (plane.getHeight() / 2), Color.ORANGE));
-                    }
-                    enemy.y = 100;
-                }
-
-                if (!enemy.isActive()) {
-                    enemies.remove(i);
-                    i--;
-                }
-            }
-        }
-
-        // ۴. آپدیت تخم‌مرغ‌ها و گلوله‌های دشمن
-        if (!isFrozen) {
-            for (int i = 0; i < eggs.size(); i++) {
-                model.Egg egg = eggs.get(i);
-                egg.update();
-                if (!egg.isActive()) {
-                    eggs.remove(i);
-                    i--;
-                }
-            }
-        }
-
-        // ۵. آپدیت پاورآپ‌های در حال سقوط
-        for (int i = 0; i < powerUps.size(); i++) {
-            PowerUp p = powerUps.get(i);
-            p.update();
-            if (!p.isActive()) {
-                powerUps.remove(i);
-                i--;
-            }
-        }
-
-        // ۶. سیستم برخورد تیرهای هواپیما به مرغ‌ها و غول‌ها
-        if (currentLevel == 4 || currentLevel == 8) {
-            if (!enemies.isEmpty()) {
-                Enemy boss = enemies.get(0);
-
-                for (int i = 0; i < bullets.size(); i++) {
-                    model.Bullet b = bullets.get(i);
-
-                    if (b.getBounds().intersects(boss.getBounds())) {
-                        bullets.remove(i);
-                        i--;
-
-                        if (boss.isActive() && boss.getLives() > 0) {
-                            boss.takeDamage();
-
-                            if (!boss.isActive() || boss.getLives() <= 0) {
-                                controller.SoundManager.playCollisionSound();
-
-                                explosions.add(new model.Explosion(
-                                        boss.getX() + (boss.getBounds().width / 2),
-                                        boss.getY() + (boss.getBounds().height / 2),
-                                        Color.ORANGE
-                                ));
-
-                                enemies.remove(boss);
-
-                                if (currentLevel == 4) {
-                                    score += 500;
-                                    System.out.println("Boss 1 Defeated! +500 Score!");
-                                }
-                                else if (currentLevel == 8) {
-                                    score += 1000;
-                                    gameTimer.stop();
-                                    isVictory = true;
-
-                                    controller.SoundManager.stopBackgroundMusic();
-                                    controller.SoundManager.playGameOverSound();
-
-                                    if (!scoreSaved && UserSession.isLoggedIn()) {
-                                        DatabaseManager.saveGameRecord(UserSession.getUsername(), score, 8, "ON");
-                                        scoreSaved = true;
-                                        System.out.println("Victory record saved into database!");
-                                    }
-
-                                    SwingUtilities.invokeLater(() -> {
-                                        JOptionPane.showMessageDialog(this, "شما برنده شدید!\nامتیاز نهایی: " + score, "پیروزی", JOptionPane.INFORMATION_MESSAGE);
-                                    });
-                                    return;
-                                }
-
-                                gridManager.handleEnemyDeath(boss);
-                                this.currentLevel = gridManager.getCurrentLevel();
-                                return;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        else {
-            for (int i = 0; i < bullets.size(); i++) {
-                model.Bullet b = bullets.get(i);
-
-                for (int j = 0; j < enemies.size(); j++) {
-                    Enemy enemy = enemies.get(j);
-
-                    if (b.getBounds().intersects(enemy.getBounds())) {
-                        bullets.remove(i);
-                        i--;
-
-                        if (enemy.isActive() && enemy.getLives() > 0) {
-                            enemy.takeDamage();
-
-                            if (!enemy.isActive() || enemy.getLives() <= 0) {
-
-                                String className = enemy.getClass().getSimpleName();
-                                if (className.contains("Shooter")) {
-                                    score += 25;
-                                } else if (className.contains("Zigzag")) {
-                                    score += 20;
-                                } else if (className.contains("Fast")) {
-                                    score += 15;
-                                } else {
-                                    score += 10;
-                                }
-
-                                gridManager.handleEnemyDeath(enemy);
-                                controller.SoundManager.playCollisionSound();
-
-                                explosions.add(new model.Explosion(
-                                        enemy.getX() + (enemy.getBounds().width / 2),
-                                        enemy.getY() + (enemy.getBounds().height / 2),
-                                        Color.RED
-                                ));
-
-                                if (Math.random() < 0.20) {
-                                    PowerUpType[] types = PowerUpType.values();
-                                    PowerUpType randomType = types[(int) (Math.random() * types.length)];
-                                    powerUps.add(new PowerUp(enemy.getX(), enemy.getY(), randomType));
-                                }
-
-                                enemies.remove(j);
-                                j--;
-                            }
-                        }
-                        break;
-                    }
-                }
-            }
-        }
-
-        // ۷. سیستم برخورد تخم‌مرغ‌ها به هواپیما
-        for (int i = 0; i < eggs.size(); i++) {
-            model.Egg egg = eggs.get(i);
-            if (egg.getBounds().intersects(plane.getBounds())) {
-                eggs.remove(i);
-                i--;
-
-                if (!plane.isShieldActive()) {
-                    plane.setLives(plane.getLives() - 1);
-
-                    controller.SoundManager.playCollisionSound();
-
-                    explosions.add(new model.Explosion(plane.getX() + (plane.getWidth() / 2), plane.getY() + (plane.getHeight() / 2), Color.YELLOW));
-                }
-            }
-        }
-
-        // ۸. سیستم برخورد هواپیما با پاورآپ‌ها
-        for (int i = 0; i < powerUps.size(); i++) {
-            PowerUp p = powerUps.get(i);
-            if (p.getBounds().intersects(plane.getBounds())) {
-                plane.applyPowerUp(p.getType());
-
-                if (p.getType() == PowerUpType.FREEZE_BOMB) {
-                    isFrozen = true;
-                    freezeEndTime = System.currentTimeMillis() + 3000;
-                }
-                else if (p.getType() == PowerUpType.EXTRA_LIFE) {
-                    showLifeGainedMessage = true;
-                    lifeMessageEndTime = System.currentTimeMillis() + 1500; // پیام تا ۱.۵ ثانیه زنده بماند
-                }
-
-                powerUps.remove(i);
-                i--;
-            }
-        }
-        if (showLifeGainedMessage && System.currentTimeMillis() > lifeMessageEndTime) {
-            showLifeGainedMessage = false;
-        }
-
-        // ۹. آپدیت افکت‌های انفجار
-        for (int i = 0; i < explosions.size(); i++) {
-            model.Explosion exp = explosions.get(i);
-            exp.update();
-            if (!exp.isActive()) {
-                explosions.remove(i);
-                i--;
-            }
-        }
-
-        //بررسی پیروزی نهایی در انتهای لول ۸
-        if (currentLevel == 8 && enemies.isEmpty()) {
-            gameTimer.stop();
-            isVictory = true;
-            this.requestFocusInWindow();
-
-            controller.SoundManager.stopBackgroundMusic();
-            controller.SoundManager.playGameOverSound();
-
-            if (!scoreSaved && UserSession.isLoggedIn()) {
-                DatabaseManager.saveGameRecord(UserSession.getUsername(), score, currentLevel, "Default Settings");
-                scoreSaved = true;
-                System.out.println("Victory record saved into database!");
-            }
-
-            // نمایش پیغام «پیروزی» بر اساس بند ۵
-            SwingUtilities.invokeLater(() -> {
-                JOptionPane.showMessageDialog(this, "شما برنده شدید!\nامتیاز نهایی: " + score, "پیروزی", JOptionPane.INFORMATION_MESSAGE);
-            });
+    private void updateFreezeState() {
+        if (frozen && System.currentTimeMillis() >= freezeEndTime) {
+            frozen = false;
         }
     }
 
+    private void updateEnemiesAndGrid() {
+        if (frozen) {
+            return;
+        }
+
+        int previousLevel = currentLevel;
+        gridManager.update();
+        currentLevel = gridManager.getCurrentLevel();
+        addLevelClearBonus(previousLevel, currentLevel);
+
+        for (Enemy enemy : new ArrayList<>(enemies)) {
+            if (enemy instanceof Boss) {
+                ((Boss) enemy).updateAttack(eggs);
+            }
+
+            enemy.update();
+            handleEnemyReachingBottom(enemy);
+        }
+
+        enemies.removeIf(enemy -> !enemy.isActive());
+    }
+
+    private void addLevelClearBonus(int previousLevel, int newLevel) {
+        if (newLevel > previousLevel && previousLevel != MID_BOSS_LEVEL && previousLevel != FINAL_BOSS_LEVEL) {
+            score += NORMAL_LEVEL_BONUS;
+        }
+    }
+
+    private void handleEnemyReachingBottom(Enemy enemy) {
+        if (enemy.y <= 500) {
+            return;
+        }
+
+        damagePlane(Color.ORANGE);
+        enemy.y = 100;
+    }
+
+    private void updateProjectiles() {
+        updateBullets();
+        if (!frozen) {
+            updateEggs();
+        }
+    }
+
+    private void updateBullets() {
+        for (Bullet bullet : new ArrayList<>(bullets)) {
+            bullet.update();
+        }
+        bullets.removeIf(bullet -> !bullet.isActive());
+    }
+
+    private void updateEggs() {
+        for (Egg egg : new ArrayList<>(eggs)) {
+            egg.update();
+        }
+        eggs.removeIf(egg -> !egg.isActive());
+    }
+
+    private void updatePowerUps() {
+        for (PowerUp powerUp : new ArrayList<>(powerUps)) {
+            powerUp.update();
+        }
+        powerUps.removeIf(powerUp -> !powerUp.isActive());
+    }
+
+    private void updateExplosions() {
+        for (Explosion explosion : new ArrayList<>(explosions)) {
+            explosion.update();
+        }
+        explosions.removeIf(explosion -> !explosion.isActive());
+    }
+
+    private void handlePlaneEnemyCollisions() {
+        if (plane.isShieldActive()) {
+            return;
+        }
+
+        Rectangle planeBounds = plane.getBounds();
+        for (Enemy enemy : new ArrayList<>(enemies)) {
+            if (planeBounds.intersects(enemy.getBounds())) {
+                damagePlane(Color.RED);
+                enemies.remove(enemy);
+            }
+        }
+    }
+
+    private void handleBulletEnemyCollisions() {
+        for (Bullet bullet : new ArrayList<>(bullets)) {
+            Enemy hitEnemy = findHitEnemy(bullet);
+            if (hitEnemy == null) {
+                continue;
+            }
+
+            bullets.remove(bullet);
+            hitEnemy.takeDamage();
+
+            if (!hitEnemy.isActive() || hitEnemy.getLives() <= 0) {
+                handleEnemyDestroyed(hitEnemy);
+            }
+        }
+    }
+
+    private Enemy findHitEnemy(Bullet bullet) {
+        for (Enemy enemy : enemies) {
+            if (bullet.getBounds().intersects(enemy.getBounds())) {
+                return enemy;
+            }
+        }
+        return null;
+    }
+
+    private void handleEnemyDestroyed(Enemy enemy) {
+        addExplosionAtEnemy(enemy);
+        SoundManager.playCollisionSound();
+
+        if (enemy instanceof Boss) {
+            handleBossDestroyed(enemy);
+            return;
+        }
+
+        score += getEnemyScore(enemy);
+        createPowerUpIfLucky(enemy);
+        gridManager.handleEnemyDeath(enemy);
+        enemies.remove(enemy);
+    }
+
+    private void handleBossDestroyed(Enemy boss) {
+        enemies.remove(boss);
+
+        if (currentLevel == MID_BOSS_LEVEL) {
+            score += MID_BOSS_BONUS;
+            gridManager.handleEnemyDeath(boss);
+            currentLevel = gridManager.getCurrentLevel();
+            return;
+        }
+
+        if (currentLevel == FINAL_BOSS_LEVEL) {
+            score += FINAL_BOSS_BONUS;
+            finishGame(true);
+        }
+    }
+
+    private int getEnemyScore(Enemy enemy) {
+        String enemyType = enemy.getClass().getSimpleName();
+        if (enemyType.contains("Shooter")) {
+            return 25;
+        }
+        if (enemyType.contains("Zigzag")) {
+            return 20;
+        }
+        if (enemyType.contains("Fast")) {
+            return 15;
+        }
+        return 10;
+    }
+
+    private void createPowerUpIfLucky(Enemy enemy) {
+        if (Math.random() >= POWER_UP_DROP_CHANCE) {
+            return;
+        }
+
+        PowerUpType[] types = PowerUpType.values();
+        int randomIndex = (int) (Math.random() * types.length);
+        powerUps.add(new PowerUp(enemy.getX(), enemy.getY(), types[randomIndex]));
+    }
+
+    private void addExplosionAtEnemy(Enemy enemy) {
+        Rectangle bounds = enemy.getBounds();
+        explosions.add(new Explosion(
+                enemy.getX() + bounds.width / 2,
+                enemy.getY() + bounds.height / 2,
+                Color.RED
+        ));
+    }
+
+    private void handleEggPlaneCollisions() {
+        for (Egg egg : new ArrayList<>(eggs)) {
+            if (egg.getBounds().intersects(plane.getBounds())) {
+                eggs.remove(egg);
+                damagePlane(Color.YELLOW);
+            }
+        }
+    }
+
+    private void damagePlane(Color explosionColor) {
+        if (plane.isShieldActive()) {
+            return;
+        }
+
+        plane.setLives(plane.getLives() - 1);
+        SoundManager.playCollisionSound();
+        explosions.add(new Explosion(
+                plane.getX() + plane.getWidth() / 2,
+                plane.getY() + plane.getHeight() / 2,
+                explosionColor
+        ));
+    }
+
+    private void handlePlanePowerUpCollisions() {
+        for (PowerUp powerUp : new ArrayList<>(powerUps)) {
+            if (!powerUp.getBounds().intersects(plane.getBounds())) {
+                continue;
+            }
+
+            applyPowerUp(powerUp);
+            powerUps.remove(powerUp);
+        }
+    }
+
+    private void applyPowerUp(PowerUp powerUp) {
+        plane.applyPowerUp(powerUp.getType());
+
+        if (powerUp.getType() == PowerUpType.FREEZE_BOMB) {
+            frozen = true;
+            freezeEndTime = System.currentTimeMillis() + FREEZE_DURATION_MS;
+        } else if (powerUp.getType() == PowerUpType.EXTRA_LIFE) {
+            showLifeGainedMessage = true;
+            lifeMessageEndTime = System.currentTimeMillis() + LIFE_MESSAGE_DURATION_MS;
+        }
+    }
+
+    private void updateLifeMessageState() {
+        if (showLifeGainedMessage && System.currentTimeMillis() >= lifeMessageEndTime) {
+            showLifeGainedMessage = false;
+        }
+    }
+
+    private void checkFinalVictory() {
+        if (currentLevel == FINAL_BOSS_LEVEL && enemies.isEmpty() && !victory) {
+            finishGame(true);
+        }
+    }
+
+    private void finishGame(boolean playerWon) {
+        if (!gameTimer.isRunning() && scoreSaved) {
+            return;
+        }
+
+        victory = playerWon;
+        gameTimer.stop();
+        SoundManager.stopBackgroundMusic();
+        SoundManager.playGameOverSound();
+        saveGameResult();
+        requestFocusInWindow();
+
+        String message = playerWon
+                ? "شما برنده شدید!\nامتیاز نهایی: " + score
+                : "بازی تمام شد!\nامتیاز نهایی شما: " + score;
+        String title = playerWon ? "پیروزی" : "Game Over";
+        int messageType = playerWon ? JOptionPane.INFORMATION_MESSAGE : JOptionPane.ERROR_MESSAGE;
+
+        SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(this, message, title, messageType));
+    }
+
+    private void saveGameResult() {
+        if (scoreSaved || !UserSession.isLoggedIn()) {
+            return;
+        }
+
+        DatabaseManager.saveGameRecord(
+                UserSession.getUsername(),
+                score,
+                currentLevel,
+                SOUND_SETTINGS_SNAPSHOT
+        );
+        scoreSaved = true;
+    }
+
     @Override
-    protected void paintComponent(Graphics g) {
-        super.paintComponent(g);
-        Graphics2D g2d = (Graphics2D) g;
+    protected void paintComponent(Graphics graphics) {
+        super.paintComponent(graphics);
+        Graphics2D g2d = (Graphics2D) graphics.create();
+        try {
+            g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            drawBackground(g2d);
+            drawGameObjects(g2d);
+            drawHud(g2d);
+            drawStateOverlays(g2d);
+        } finally {
+            g2d.dispose();
+        }
+    }
 
-        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-        if (backgroundImage != null) {
-            g2d.drawImage(backgroundImage, 0, backgroundY, null);
-            g2d.drawImage(backgroundImage, 0, backgroundY - 600, null);
-        } else {
+    private void drawBackground(Graphics2D g2d) {
+        if (backgroundImage == null) {
             g2d.setColor(Color.BLACK);
-            g2d.fillRect(0, 0, 800, 600);
+            g2d.fillRect(0, 0, PANEL_WIDTH, PANEL_HEIGHT);
+            return;
         }
 
-        for (model.Explosion exp : explosions) {
-            exp.draw(g2d);
-        }
+        g2d.drawImage(backgroundImage, 0, backgroundY, null);
+        g2d.drawImage(backgroundImage, 0, backgroundY - PANEL_HEIGHT, null);
+    }
 
+    private void drawGameObjects(Graphics2D g2d) {
+        for (Explosion explosion : explosions) {
+            explosion.draw(g2d);
+        }
         plane.draw(g2d);
-
-        for (model.Bullet b : bullets) {
-            b.draw(g2d);
+        for (Bullet bullet : bullets) {
+            bullet.draw(g2d);
         }
-
         for (Enemy enemy : enemies) {
             enemy.draw(g2d);
         }
-
-        for (model.Egg egg : eggs) {
+        for (Egg egg : eggs) {
             egg.draw(g2d);
         }
-
-        for (PowerUp p : powerUps) {
-            p.draw(g2d);
-        }
-
-        drawHUD(g2d);
-
-        if (isFrozen) {
-            g2d.setColor(new Color(0, 191, 255, 35));
-            g2d.fillRect(0, 0, 800, 600);
-        }
-
-        if (isPaused) {
-            g2d.setColor(new Color(0, 0, 0, 150));
-            g2d.fillRect(0, 0, 800, 600);
-            g2d.setColor(Color.YELLOW);
-            g2d.setFont(new Font("Arial", Font.BOLD, 36));
-            g2d.drawString("PAUSED", 330, 300);
-        }
-
-        if (plane.getLives() <= 0) {
-            g2d.setColor(new Color(150, 0, 0, 180));
-            g2d.fillRect(0, 0, 800, 600);
-            g2d.setColor(Color.WHITE);
-            g2d.setFont(new Font("Arial", Font.BOLD, 48));
-            g2d.drawString("GAME OVER", 260, 280);
-
-            g2d.setFont(new Font("Arial", Font.PLAIN, 18));
-            g2d.drawString("Press SPACE to Replay / Restart Game", 245, 330);
-
-            g2d.setFont(new Font("Arial", Font.PLAIN, 16));
-            g2d.setColor(new Color(230, 230, 230));
-            g2d.drawString("Press ESC or ENTER to return to Main Menu", 235, 370);
-        }
-
-        if (isVictory) {
-            g2d.setColor(new Color(0, 150, 0, 180));
-            g2d.fillRect(0, 0, 800, 600);
-            g2d.setColor(Color.WHITE);
-            g2d.setFont(new Font("Arial", Font.BOLD, 48));
-            g2d.drawString("VICTORY!", 290, 300);
-
-            g2d.setFont(new Font("Arial", Font.PLAIN, 18));
-            g2d.drawString("Press ENTER to return to Main Menu", 255, 350);
+        for (PowerUp powerUp : powerUps) {
+            powerUp.draw(g2d);
         }
     }
 
-    private void drawHUD(Graphics2D g2d) {
+    private void drawHud(Graphics2D g2d) {
         g2d.setColor(Color.WHITE);
         g2d.setFont(new Font("Arial", Font.BOLD, 14));
 
-        String currentUser = UserSession.isLoggedIn() ? UserSession.getUsername() : "Guest";
-        g2d.drawString("USER: " + currentUser, 20, 30);
-
+        String username = UserSession.isLoggedIn() ? UserSession.getUsername() : "Guest";
+        g2d.drawString("USER: " + username, 20, 30);
         g2d.drawString("SCORE: " + score, 180, 30);
-
         g2d.drawString("LIVES: " + plane.getLives(), 320, 30);
-
-        int currentGuns = plane.getFireLevel();
-        g2d.drawString("GUNS SYNC: [ " + currentGuns + " BULLETS ]", 450, 30);
-
+        g2d.drawString("GUNS SYNC: [ " + plane.getFireLevel() + " BULLETS ]", 450, 30);
         g2d.drawString("LEVEL: " + currentLevel, 710, 30);
 
-        int HUD_Y = 65;
+        drawActivePowerUps(g2d, 65);
+    }
+
+    private void drawActivePowerUps(Graphics2D g2d, int startY) {
+        int hudY = startY;
 
         if (plane.isShieldActive()) {
             g2d.setColor(Color.CYAN);
-            g2d.drawString("SHIELD ACTIVE", 20, HUD_Y);
-            HUD_Y += 22;
+            g2d.drawString("SHIELD ACTIVE", 20, hudY);
+            hudY += 22;
         }
-
-        if (isFrozen) {
+        if (plane.isRapidFireActive()) {
+            g2d.setColor(Color.MAGENTA);
+            g2d.drawString("RAPID FIRE ACTIVE", 20, hudY);
+            hudY += 22;
+        }
+        if (frozen) {
             g2d.setColor(new Color(30, 144, 255));
-            g2d.drawString("FREEZE BOMB ACTIVE", 20, HUD_Y);
-            HUD_Y += 22;
+            g2d.drawString("FREEZE BOMB ACTIVE", 20, hudY);
+            hudY += 22;
         }
-
-        if (currentGuns > 1) {
+        if (plane.getFireLevel() > 1) {
             g2d.setColor(Color.ORANGE);
-            g2d.drawString("WEAPON BOOST ACTIVE (Level " + currentGuns + ")", 20, HUD_Y);
-            HUD_Y += 22;
+            g2d.drawString("WEAPON BOOST ACTIVE (Level " + plane.getFireLevel() + ")", 20, hudY);
+            hudY += 22;
         }
-
         if (showLifeGainedMessage) {
             g2d.setColor(new Color(50, 205, 50));
-            g2d.drawString("EXTRA LIFE GAINED! (+1 LIFE)", 20, HUD_Y);
+            g2d.drawString("EXTRA LIFE GAINED! (+1 LIFE)", 20, hudY);
         }
+    }
+
+    private void drawStateOverlays(Graphics2D g2d) {
+        if (frozen) {
+            g2d.setColor(new Color(0, 191, 255, 35));
+            g2d.fillRect(0, 0, PANEL_WIDTH, PANEL_HEIGHT);
+        }
+        if (paused) {
+            drawCenteredOverlay(g2d, new Color(0, 0, 0, 150), Color.YELLOW, "PAUSED", 300);
+        }
+        if (plane.getLives() <= 0) {
+            drawGameOverOverlay(g2d);
+        }
+        if (victory) {
+            drawVictoryOverlay(g2d);
+        }
+    }
+
+    private void drawCenteredOverlay(Graphics2D g2d, Color background, Color foreground, String text, int y) {
+        g2d.setColor(background);
+        g2d.fillRect(0, 0, PANEL_WIDTH, PANEL_HEIGHT);
+        g2d.setColor(foreground);
+        g2d.setFont(new Font("Arial", Font.BOLD, 36));
+        int x = (PANEL_WIDTH - g2d.getFontMetrics().stringWidth(text)) / 2;
+        g2d.drawString(text, x, y);
+    }
+
+    private void drawGameOverOverlay(Graphics2D g2d) {
+        drawCenteredOverlay(g2d, new Color(150, 0, 0, 180), Color.WHITE, "GAME OVER", 280);
+        g2d.setFont(new Font("Arial", Font.PLAIN, 18));
+        g2d.drawString("Press SPACE to Replay / Restart Game", 245, 330);
+        g2d.setFont(new Font("Arial", Font.PLAIN, 16));
+        g2d.drawString("Press ESC or ENTER to return to Main Menu", 235, 370);
+    }
+
+    private void drawVictoryOverlay(Graphics2D g2d) {
+        drawCenteredOverlay(g2d, new Color(0, 150, 0, 180), Color.WHITE, "VICTORY!", 300);
+        g2d.setFont(new Font("Arial", Font.PLAIN, 18));
+        g2d.drawString("Press ENTER to return to Main Menu", 255, 350);
     }
 
     @Override
-    public void keyPressed(KeyEvent e) {
-        int key = e.getKeyCode();
+    public void keyPressed(KeyEvent event) {
+        int keyCode = event.getKeyCode();
 
-        if (isVictory && key == KeyEvent.VK_ENTER) {
-            Window topFrame = SwingUtilities.getWindowAncestor(this);
-            if (topFrame != null) {
-                topFrame.dispose();
-            }
-
-            controller.SoundManager.playBackgroundMusic();
-
-            SwingUtilities.invokeLater(() -> {
-                new view.MainMenu().setVisible(true);
-            });
+        if (keyCode == KeyEvent.VK_P && !isGameFinished()) {
+            paused = !paused;
             return;
         }
 
-        if (key == KeyEvent.VK_SPACE) {
-            if (plane.getLives() <= 0) {
-                restartGame();
-                return;
-            }
-
-            if (isPaused) {
-                isPaused = false;
-            } else {
-                if (plane.canShoot()) {
-                    controller.SoundManager.playShotSound();
-
-                    int bulletX = plane.getX() + (plane.getWidth() / 2);
-                    int bulletY = plane.getY();
-                    int fireLevel = plane.getFireLevel();
-
-                    if (fireLevel == 1) {
-                        bullets.add(new model.Bullet(bulletX, bulletY));
-                    } else if (fireLevel == 2) {
-                        bullets.add(new model.Bullet(bulletX - 15, bulletY));
-                        bullets.add(new model.Bullet(bulletX + 15, bulletY));
-                    } else {
-                        bullets.add(new model.Bullet(bulletX, bulletY));
-                        bullets.add(new model.Bullet(bulletX - 25, bulletY));
-                        bullets.add(new model.Bullet(bulletX + 25, bulletY));
-                    }
-                    plane.shootMock();
-                }
-            }
+        if (keyCode == KeyEvent.VK_SPACE) {
+            handleSpaceKey();
             return;
         }
 
-        if (plane.getLives() <= 0 || (currentLevel == 8 && enemies.isEmpty())) return;
-        if (isPaused) return;
-
-        if (key == KeyEvent.VK_LEFT || key == KeyEvent.VK_A) plane.setDx(-plane.getSpeed());
-        if (key == KeyEvent.VK_RIGHT || key == KeyEvent.VK_D) plane.setDx(plane.getSpeed());
-        if (key == KeyEvent.VK_UP || key == KeyEvent.VK_W) plane.setDy(-plane.getSpeed());
-        if (key == KeyEvent.VK_DOWN || key == KeyEvent.VK_S) plane.setDy(plane.getSpeed());
-
-        if (key == KeyEvent.VK_P) {
-            isPaused = !isPaused;
+        if (isGameFinished() || paused) {
+            return;
         }
 
-        if (key == KeyEvent.VK_ESCAPE) {
-            gameTimer.stop();
-            controller.SoundManager.stopBackgroundMusic();
+        handleMovementKeyPressed(keyCode);
 
-            Window topFrame = SwingUtilities.getWindowAncestor(this);
-            if (topFrame != null) {
-                topFrame.dispose();
-            }
-
-            controller.SoundManager.playBackgroundMusic();
-            if (this.mainMenu != null) {
-                this.mainMenu.setVisible(true);
-            }
-        }
-
-        if (key == KeyEvent.VK_M) {
-            isPaused = true;
-            Window topFrame = SwingUtilities.getWindowAncestor(this);
-            JDialog soundMenu = new JDialog(topFrame, "تنظیمات صدا", Dialog.ModalityType.APPLICATION_MODAL);
-            soundMenu.setSize(300, 200);
-            soundMenu.setLayout(new GridLayout(3, 1, 10, 10));
-            soundMenu.setLocationRelativeTo(this);
-
-            JButton toggleSoundBtn = new JButton(controller.SoundManager.isMusicEnabled() ? "🔈 قطع صدا" : "🔊 وصل صدا");
-            toggleSoundBtn.addActionListener(evt -> {
-                controller.SoundManager.toggleAllSounds();
-                toggleSoundBtn.setText(controller.SoundManager.isMusicEnabled() ? "🔈 قطع صدا" : "🔊 وصل صدا");
-            });
-
-            JButton closeBtn = new JButton("بازگشت به بازی");
-            closeBtn.addActionListener(evt -> soundMenu.dispose());
-
-            JLabel infoLabel = new JLabel("تنظیمات صوتی حین بازی", SwingConstants.CENTER);
-            infoLabel.setFont(new Font("Arial", Font.BOLD, 14));
-
-            soundMenu.add(infoLabel);
-            soundMenu.add(toggleSoundBtn);
-            soundMenu.add(closeBtn);
-
-            soundMenu.setVisible(true);
+        if (keyCode == KeyEvent.VK_M) {
+            openSoundMenu();
         }
     }
 
+    private void handleSpaceKey() {
+        if (plane.getLives() <= 0) {
+            restartGame();
+            return;
+        }
+        if (victory || paused || !plane.canShoot()) {
+            return;
+        }
+
+        SoundManager.playShotSound();
+        createPlayerBullets();
+        plane.shootMock();
+    }
+
+    private void createPlayerBullets() {
+        int bulletCount = Math.max(1, plane.getFireLevel());
+        int centerX = plane.getX() + plane.getWidth() / 2;
+        int bulletY = plane.getY();
+        double centerIndex = (bulletCount - 1) / 2.0;
+
+        for (int index = 0; index < bulletCount; index++) {
+            int offset = (int) Math.round((index - centerIndex) * BULLET_SPACING);
+            bullets.add(new Bullet(centerX + offset, bulletY));
+        }
+    }
+
+    private void handleMovementKeyPressed(int keyCode) {
+        if (keyCode == KeyEvent.VK_LEFT || keyCode == KeyEvent.VK_A) {
+            plane.setDx(-plane.getSpeed());
+        } else if (keyCode == KeyEvent.VK_RIGHT || keyCode == KeyEvent.VK_D) {
+            plane.setDx(plane.getSpeed());
+        } else if (keyCode == KeyEvent.VK_UP || keyCode == KeyEvent.VK_W) {
+            plane.setDy(-plane.getSpeed());
+        } else if (keyCode == KeyEvent.VK_DOWN || keyCode == KeyEvent.VK_S) {
+            plane.setDy(plane.getSpeed());
+        }
+    }
+
+    private void openSoundMenu() {
+        paused = true;
+        Window owner = SwingUtilities.getWindowAncestor(this);
+        JDialog soundMenu = new JDialog(owner, "تنظیمات صدا", Dialog.ModalityType.APPLICATION_MODAL);
+        soundMenu.setSize(300, 200);
+        soundMenu.setLayout(new GridLayout(3, 1, 10, 10));
+        soundMenu.setLocationRelativeTo(this);
+
+        JLabel title = new JLabel("تنظیمات صوتی حین بازی", SwingConstants.CENTER);
+        title.setFont(new Font("Arial", Font.BOLD, 14));
+
+        JButton toggleSoundButton = new JButton(getSoundButtonText());
+        toggleSoundButton.addActionListener(event -> {
+            SoundManager.toggleAllSounds();
+            toggleSoundButton.setText(getSoundButtonText());
+        });
+
+        JButton closeButton = new JButton("بازگشت به بازی");
+        closeButton.addActionListener(event -> soundMenu.dispose());
+
+        soundMenu.add(title);
+        soundMenu.add(toggleSoundButton);
+        soundMenu.add(closeButton);
+        soundMenu.setVisible(true);
+    }
+
+    private String getSoundButtonText() {
+        return SoundManager.isMusicEnabled() ? "🔈 قطع صدا" : "🔊 وصل صدا";
+    }
+
     private void restartGame() {
-        plane.setLives(3);
-        plane.setFireLevel(1);
-        plane.setLocation(375, 500);
+        resetGameState();
+        resetCollections();
+        resetPlayer();
 
+        gridManager.resetToLevel(START_LEVEL);
+        currentLevel = gridManager.getCurrentLevel();
+
+        SoundManager.playBackgroundMusic();
+        gameTimer.start();
+        requestFocusInWindow();
+        repaint();
+    }
+
+    private void resetGameState() {
         score = 0;
-        currentLevel = 1;
+        currentLevel = START_LEVEL;
         scoreSaved = false;
-        isVictory = false;
-        isPaused = false;
-        isFrozen = false;
+        victory = false;
+        paused = false;
+        frozen = false;
+        showLifeGainedMessage = false;
+        backgroundY = 0;
+    }
 
+    private void resetCollections() {
         bullets.clear();
         enemies.clear();
         eggs.clear();
         powerUps.clear();
         explosions.clear();
+    }
 
-        gridManager.resetToLevel(1);
-        this.currentLevel = gridManager.getCurrentLevel();
+    private void resetPlayer() {
+        plane.loadStats(GameConfig.activePlaneName);
+        plane.setFireLevel(1);
+        plane.setLocation(375, 500);
+    }
 
-        controller.SoundManager.playBackgroundMusic();
-        gameTimer.start();
+    private boolean isGameFinished() {
+        return victory || plane.getLives() <= 0;
+    }
 
-        this.requestFocusInWindow();
-        repaint();
+    private void returnToMainMenu() {
+        if (!isGameFinished()) {
+            saveGameResult();
+        }
 
-        System.out.println("🔄 Game successfully restarted via SPACE key!");
+        gameTimer.stop();
+        SoundManager.stopBackgroundMusic();
+
+        Window gameWindow = SwingUtilities.getWindowAncestor(this);
+        if (gameWindow != null) {
+            gameWindow.dispose();
+        }
+
+        SoundManager.playBackgroundMusic();
+        if (mainMenu != null) {
+            mainMenu.setVisible(true);
+        }
     }
 
     @Override
-    public void keyReleased(KeyEvent e) {
-        int key = e.getKeyCode();
-
-        if (key == KeyEvent.VK_LEFT || key == KeyEvent.VK_A || key == KeyEvent.VK_RIGHT || key == KeyEvent.VK_D) {
+    public void keyReleased(KeyEvent event) {
+        int keyCode = event.getKeyCode();
+        if (keyCode == KeyEvent.VK_LEFT || keyCode == KeyEvent.VK_A
+                || keyCode == KeyEvent.VK_RIGHT || keyCode == KeyEvent.VK_D) {
             plane.setDx(0);
         }
-        if (key == KeyEvent.VK_UP || key == KeyEvent.VK_W || key == KeyEvent.VK_DOWN || key == KeyEvent.VK_S) {
+        if (keyCode == KeyEvent.VK_UP || keyCode == KeyEvent.VK_W
+                || keyCode == KeyEvent.VK_DOWN || keyCode == KeyEvent.VK_S) {
             plane.setDy(0);
         }
     }
 
-    @Override public void keyTyped(KeyEvent e) {}
+    @Override
+    public void keyTyped(KeyEvent event) {
+        // This game only uses keyPressed and keyReleased.
+    }
 }
