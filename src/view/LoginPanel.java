@@ -37,23 +37,19 @@ public class LoginPanel extends JPanel {
             }
 
             if (DatabaseManager.loginUser(username, password)) {
-                UserSession.setUsername(username); // ذخیره در حافظه تا پایان برنامه (بند ۲.۲)
+                UserSession.setUsername(username);
 
-                // بارگذاری از ۴ ستون و فرستادن به SoundManager به محض ورود
                 int[] savedSounds = model.database.DatabaseManager.getSoundSettings(username);
                 String formatStr = savedSounds[0] + "," + savedSounds[1] + "," + savedSounds[2] + "," + savedSounds[3];
                 controller.SoundManager.updateSettings(formatStr);
 
                 succeeded = true;
                 JOptionPane.showMessageDialog(this, "ورود موفقیت‌آمیز بود! خوش آمدید.");
-                parentDialog.dispose(); // بستن دیالوگ
+                parentDialog.dispose();
             } else {
                 JOptionPane.showMessageDialog(this, "نام کاربری یا رمز عبور اشتباه است!", "خطا", JOptionPane.ERROR_MESSAGE);
             }
         });
     }
 
-    public boolean isSucceeded() {
-        return succeeded;
-    }
 }

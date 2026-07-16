@@ -18,11 +18,9 @@ public class MainMenu extends JFrame {
         setLocationRelativeTo(null);
         setResizable(false);
 
-        // استفاده از پنل سفارشی برای پس‌زمینه
         BackgroundPanel mainPanel = new BackgroundPanel();
         mainPanel.setLayout(new BoxLayout(mainPanel, BoxLayout.Y_AXIS));
 
-        // عنوان بازی
         JLabel titleLabel = new JLabel("CHICKEN INVADERS");
         titleLabel.setForeground(Color.YELLOW);
         titleLabel.setFont(new Font("Impact", Font.BOLD, 40));
@@ -32,20 +30,21 @@ public class MainMenu extends JFrame {
         mainPanel.add(titleLabel);
         mainPanel.add(Box.createRigidArea(new Dimension(0, 40)));
 
-        // ایجاد دکمه‌ها
         btnAuth = createMenuButton("");
         updateAuthButtonText();
 
         JButton btnNewGame = createMenuButton("Start Game");
+        JButton btnStore = createMenuButton("Store"); // دکمه فروشگاه
         JButton btnHighScores = createMenuButton("High Scores");
         JButton btnSettings = createMenuButton("Settings");
         JButton btnHowToPlay = createMenuButton("How to Play");
         JButton btnExit = createMenuButton("Exit");
 
-        // اضافه کردن به پنل
         mainPanel.add(btnAuth);
         mainPanel.add(Box.createRigidArea(new Dimension(0, 15)));
         mainPanel.add(btnNewGame);
+        mainPanel.add(Box.createRigidArea(new Dimension(0, 15)));
+        mainPanel.add(btnStore);
         mainPanel.add(Box.createRigidArea(new Dimension(0, 15)));
         mainPanel.add(btnHighScores);
         mainPanel.add(Box.createRigidArea(new Dimension(0, 15)));
@@ -57,9 +56,21 @@ public class MainMenu extends JFrame {
 
         setContentPane(mainPanel);
 
-        // اکشن‌ها
         btnAuth.addActionListener(e -> handleAuth());
         btnNewGame.addActionListener(e -> { if(model.database.UserSession.isLoggedIn()) startGame(); else JOptionPane.showMessageDialog(this, "ابتدا وارد شوید!"); });
+
+        btnStore.addActionListener(e -> {
+            if(model.database.UserSession.isLoggedIn()) {
+                JDialog d = new JDialog(this, "Store", true);
+                d.setSize(500, 400);
+                d.add(new StorePanel());
+                d.setLocationRelativeTo(this);
+                d.setVisible(true);
+            } else {
+                JOptionPane.showMessageDialog(this, "ابتدا وارد شوید!");
+            }
+        });
+
         btnHighScores.addActionListener(e -> { HighScorePanel p = new HighScorePanel(this, mainPanel); setContentPane(p); revalidate(); repaint(); });
         btnSettings.addActionListener(e -> { if(model.database.UserSession.isLoggedIn()) { SettingsPanel p = new SettingsPanel(this, mainPanel); setContentPane(p); revalidate(); repaint(); } });
         btnHowToPlay.addActionListener(e -> { JDialog d = new JDialog(this, "How to Play", true); d.setSize(800, 600); d.add(new HowToPlayPanel(d)); d.setLocationRelativeTo(this); d.setVisible(true); });
@@ -70,21 +81,16 @@ public class MainMenu extends JFrame {
         });
     }
 
-    //  این کلاس جایگزین BackgroundPanel قبلی در کلاس MainMenu می‌شود
     private class BackgroundPanel extends JPanel {
         private Image backgroundImage;
-        private int bgY = 0; // متغیر برای کنترل حرکت عمودی
+        private int bgY = 0;
 
         public BackgroundPanel() {
             this.backgroundImage = new ImageIcon("icon/background.jpg").getImage();
-
-            // تایمر برای حرکت دادن پس‌زمینه (حدود ۶۰ فریم بر ثانیه)
             Timer timer = new Timer(20, e -> {
-                bgY += 1; // سرعت حرکت (هر چه عدد بیشتر باشد، سریع‌تر حرکت می‌کند)
-                if (bgY >= getHeight()) {
-                    bgY = 0; // بازگشت به شروع برای ایجاد حالت لوپ (Loop)
-                }
-                repaint(); // درخواست رسم مجدد پنل
+                bgY += 1;
+                if (bgY >= getHeight()) bgY = 0;
+                repaint();
             });
             timer.start();
         }
@@ -93,7 +99,6 @@ public class MainMenu extends JFrame {
         protected void paintComponent(Graphics g) {
             super.paintComponent(g);
             if (backgroundImage != null) {
-                // رسم دو تصویر پشت سر هم برای ایجاد حرکت بی‌وقفه
                 g.drawImage(backgroundImage, 0, bgY, getWidth(), getHeight(), this);
                 g.drawImage(backgroundImage, 0, bgY - getHeight(), getWidth(), getHeight(), null);
             }
@@ -135,25 +140,21 @@ public class MainMenu extends JFrame {
     }
 
     private void showExitConfirmation() {
-        // ایجاد دایلاگ مودال بدون حاشیه پیش‌فرض سیستم‌عامل
         JDialog exitDialog = new JDialog(this, "خروج از کهکشان", true);
-        exitDialog.setUndecorated(true); // حذف نوار عنوان پیش‌فرض ویندوز
+        exitDialog.setUndecorated(true);
         exitDialog.setSize(450, 220);
         exitDialog.setLocationRelativeTo(this);
         exitDialog.getRootPane().setBorder(BorderFactory.createLineBorder(new Color(100, 149, 237), 3)); // حاشیه نئونی
 
-        // پنل اصلی با گرادینت یا رنگ تیره یکدست
         JPanel panel = new JPanel();
         panel.setBackground(new Color(20, 20, 35));
         panel.setLayout(new BorderLayout(10, 10));
 
-        // متن سوال
         JLabel lblMsg = new JLabel("<html><div style='text-align: center; color: white; font-family: Tahoma;'>" +
                 "<b>آیا مطمئن هستید؟</b><br>پیشرفت‌های شما در آخرین مرحله ذخیره خواهد شد.</div></html>", SwingConstants.CENTER);
         lblMsg.setBorder(BorderFactory.createEmptyBorder(20, 0, 10, 0));
         panel.add(lblMsg, BorderLayout.CENTER);
 
-        // پنل دکمه‌ها
         JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 10));
         btnPanel.setOpaque(false);
 
@@ -171,7 +172,6 @@ public class MainMenu extends JFrame {
         exitDialog.setVisible(true);
     }
 
-    // متد کمکی برای استایل دادن به دکمه‌ها (می‌توانی به کلاس MainMenu اضافه کنی)
     private JButton createStyledButton(String text, Color color) {
         JButton btn = new JButton(text);
         btn.setPreferredSize(new Dimension(120, 40));
@@ -182,6 +182,7 @@ public class MainMenu extends JFrame {
         btn.setFont(new Font("Tahoma", Font.BOLD, 12));
         return btn;
     }
+
     private void startGame() {
         this.setVisible(false);
         JFrame gameFrame = new JFrame("Chicken Invaders - Game");

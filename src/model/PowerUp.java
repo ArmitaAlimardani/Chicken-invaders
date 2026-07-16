@@ -5,7 +5,7 @@ import java.awt.*;
 
 public class PowerUp {
     private int x, y;
-    private int width = 35;  // سایز کمی بزرگتر برای بهتر دیده شدن کریستال‌ها
+    private int width = 35;
     private int height = 35;
     private double speed = 2.0;
     private PowerUpType type;
@@ -16,7 +16,7 @@ public class PowerUp {
         this.x = x;
         this.y = y;
         this.type = type;
-        loadIcon(); // لود کردن اتوماتیک تصویر در بدو ساخت
+        loadIcon();
     }
 
     private void loadIcon() {
@@ -25,11 +25,10 @@ public class PowerUp {
             case ADD_FIRE:     fileName = "add_shot.png"; break;
             case RAPID_FIRE:   fileName = "fast_shot.png"; break;
             case EXTRA_LIFE:   fileName = "heal.png"; break;
-            case SHIELD:       fileName = "sheild.png"; break; // مطابق اسم فایل شما با غلط املایی sheild
+            case SHIELD:       fileName = "sheild.png"; break;
             case FREEZE_BOMB:  fileName = "freeze.png"; break;
         }
 
-        // بارگذاری تصویر از پوشه icon پروژه
         ImageIcon icon = new ImageIcon("icon\\" + fileName);
         Image rawImage = icon.getImage();
         if (rawImage != null && icon.getImageLoadStatus() == MediaTracker.COMPLETE) {
@@ -45,11 +44,9 @@ public class PowerUp {
     }
 
     public void draw(Graphics2D g2d) {
-        // اگر تصویر با موفقیت لود شده باشد، کریستال را رسم میکند
         if (powerUpImage != null) {
             g2d.drawImage(powerUpImage, x, y, null);
         } else {
-            // بک‌آپ رنگی (اگر آیکون خوانده نشود، همان دایره‌های حروف‌دار را می‌کشد)
             switch (type) {
                 case ADD_FIRE: g2d.setColor(Color.ORANGE); break;
                 case RAPID_FIRE: g2d.setColor(Color.RED); break;

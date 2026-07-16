@@ -22,33 +22,28 @@ public class TestDatabase {
             ResultSetMetaData metaData = rs.getMetaData();
             int columnCount = metaData.getColumnCount();
 
-            // تنظیم عرض ستون‌ها (حداقل ۱۵ کاراکتر برای هر ستون)
             int[] columnWidths = new int[columnCount + 1];
             for (int i = 1; i <= columnCount; i++) {
                 columnWidths[i] = Math.max(metaData.getColumnName(i).length(), 15);
             }
 
-            // ۱. چاپ خط جداکننده بالا
             for (int i = 1; i <= columnCount; i++) {
                 System.out.print("+");
                 for (int j = 0; j < columnWidths[i] + 2; j++) System.out.print("-");
             }
             System.out.println("+");
 
-            // ۲. چاپ نام ستون‌ها
             for (int i = 1; i <= columnCount; i++) {
                 System.out.printf("| %-" + columnWidths[i] + "s ", metaData.getColumnName(i));
             }
             System.out.println("|");
 
-            // ۳. چاپ خط جداکننده وسط
             for (int i = 1; i <= columnCount; i++) {
                 System.out.print("+");
                 for (int j = 0; j < columnWidths[i] + 2; j++) System.out.print("-");
             }
             System.out.println("+");
 
-            // ۴. چاپ مقادیر سطرها و ترجمه هوشمند ۰ و ۱ به ON و OFF
             while (rs.next()) {
                 for (int i = 1; i <= columnCount; i++) {
                     String columnName = metaData.getColumnName(i);
@@ -57,7 +52,6 @@ public class TestDatabase {
                     if (val == null) {
                         val = "NULL";
                     }
-                    // ترجمه فقط موقع نمایش در ترمینال
                     else if (columnName.contains("enabled") || columnName.contains("sound") || columnName.contains("music")) {
                         if (val.equals("1")) val = "ON";
                         else if (val.equals("0")) val = "OFF";
@@ -68,7 +62,6 @@ public class TestDatabase {
                 System.out.println("|");
             }
 
-            // ۵. چاپ خط جداکننده پایین
             for (int i = 1; i <= columnCount; i++) {
                 System.out.print("+");
                 for (int j = 0; j < columnWidths[i] + 2; j++) System.out.print("-");

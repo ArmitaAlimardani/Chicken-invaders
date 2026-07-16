@@ -8,7 +8,7 @@ public class Egg {
     private int width = 25;
     private int height = 30;
     private double speed;
-    private double angle; // به رادیان برای شلیک‌های چند جهته غول‌ها
+    private double angle;
     private boolean active = true;
     private Image eggImage;
 
@@ -16,9 +16,8 @@ public class Egg {
         this.x = x;
         this.y = y;
         this.speed = speed;
-        this.angle = Math.toRadians(angleDegree); // تبدیل درجه به رادیان
+        this.angle = Math.toRadians(angleDegree);
 
-        // بارگذاری عکس تخم مرغ از پوشه icon
         ImageIcon icon = new ImageIcon("icon\\egg.png");
         Image rawImage = icon.getImage();
         if (rawImage != null && icon.getImageLoadStatus() == MediaTracker.COMPLETE) {
@@ -27,11 +26,9 @@ public class Egg {
     }
 
     public void update() {
-        // حرکت در جهت زاویه تعیین شده (برای عمودی، زاویه 90 درجه داده می‌شود)
         x += (int) (speed * Math.cos(angle));
         y += (int) (speed * Math.sin(angle));
 
-        // خروج از صفحه = حذف
         if (y > 600 || y < -50 || x < -50 || x > 850) {
             active = false;
         }
