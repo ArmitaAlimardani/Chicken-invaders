@@ -1,34 +1,38 @@
 package model;
 
+import javax.swing.*;
 import java.awt.*;
 
 public class Bullet {
     private int x, y;
-    private int width = 6;
-    private int height = 15;
+    private int width = 45; // ابعاد جدید بر اساس تصویر
+    private int height = 45;
     private int speed = 8;
     private boolean active = true;
+    private Image bulletImage;
 
     public Bullet(int x, int y) {
         this.x = x - (this.width / 2);
         this.y = y;
+        // لود کردن عکس شات
+        this.bulletImage = new ImageIcon("icon\\shot.png").getImage();
     }
 
     public void update() {
         y -= speed;
-
         if (y + height < 0) {
             active = false;
         }
     }
 
     public void draw(Graphics2D g2d) {
-        // رسم یک گلوله لیزری و جذاب سرخ‌رنگ با افکت نئونی کوچک
-        g2d.setColor(new Color(255, 69, 0, 150));
-        g2d.fillRect(x - 1, y - 1, width + 2, height + 2);
-
-        g2d.setColor(Color.RED); // هسته اصلی و پررنگ گلوله
-        g2d.fillRect(x, y, width, height);
+        if (bulletImage != null) {
+            g2d.drawImage(bulletImage, x, y, width, height, null);
+        } else {
+            // بازگشت به حالت کلاسیک در صورت نبود فایل تصویر
+            g2d.setColor(Color.RED);
+            g2d.fillRect(x, y, width, height);
+        }
     }
 
     public Rectangle getBounds() {
