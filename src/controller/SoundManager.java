@@ -12,17 +12,15 @@ public class SoundManager {
     private static Clip bgMusicClip;
     private static Clip gameOverMusicClip;
 
-    // به‌روزرسانی پرچم‌ها بر اساس فرمت دیتابیس ("1,1,1,1")
     public static void updateSettings(String settingsStr) {
         String[] parts = settingsStr.split(",");
-        if (parts.length == 4) {
+        if (parts.length == 4){
             isMusicEnabled = parts[0].equals("1");
             isShotEnabled = parts[1].equals("1");
             isCollisionEnabled = parts[2].equals("1");
             isGameOverEnabled = parts[3].equals("1");
         }
 
-        //  اگر کاربر صدا را OFF کرد، هر دو کلیپ را کاملاً خاموش کن
         if (!isMusicEnabled) {
             if (bgMusicClip != null && bgMusicClip.isRunning()) {
                 bgMusicClip.stop();
@@ -30,8 +28,8 @@ public class SoundManager {
             if (gameOverMusicClip != null && gameOverMusicClip.isRunning()) {
                 gameOverMusicClip.stop();
             }
-        } else {
-            // اگر صدا ON بود و هیچ‌کدام پخش نمی‌شدند، موزیک اصلی را لود کن
+        }
+        else {
             if ((bgMusicClip == null || !bgMusicClip.isRunning()) &&
                     (gameOverMusicClip == null || !gameOverMusicClip.isRunning())) {
                 playBackgroundMusic();
@@ -39,14 +37,11 @@ public class SoundManager {
         }
     }
 
-    // ۱. موسیقی زمینه
     public static void playBackgroundMusic() {
         if (!isMusicEnabled) return;
 
-        //  قبل از پخش موزیک اصلی، مطمئن شو موزیک پایان بازی قطع شده است
-        if (gameOverMusicClip != null && gameOverMusicClip.isRunning()) {
+        if (gameOverMusicClip != null && gameOverMusicClip.isRunning())
             gameOverMusicClip.stop();
-        }
 
         try {
             if (bgMusicClip == null) {
@@ -64,7 +59,6 @@ public class SoundManager {
         }
     }
 
-    // متد توقف دستی موزیک متن
     public static void stopBackgroundMusic() {
         try {
             if (bgMusicClip != null && bgMusicClip.isRunning()) {
@@ -75,21 +69,17 @@ public class SoundManager {
         }
     }
 
-    // ۲. افکت شلیک
     public static void playShotSound() {
         if (!isShotEnabled) return;
         playSoundEffect("sounds/mixkit-short-laser-gun-shot-1670.wav");
     }
 
-    // ۳. افکت برخورد/انفجار
     public static void playCollisionSound() {
         if (!isCollisionEnabled) return;
         playSoundEffect("sounds/mixkit-epic-impact-afar-explosion-2782.wav");
     }
 
-    // ۴. صدای پایان بازی (اصلاح شده به صورت کنترل‌پذیر)
     public static void playGameOverSound() {
-        // حواسش به هر دو پرچم دیتابیس (موزیک کلی و وضعیت گیم‌اور) هست
         if (!isGameOverEnabled || !isMusicEnabled) return;
 
         try {
@@ -101,7 +91,7 @@ public class SoundManager {
             }
 
             if (!gameOverMusicClip.isRunning()) {
-                gameOverMusicClip.setFramePosition(0); // ریست فریم به ابتدا
+                gameOverMusicClip.setFramePosition(0);
                 gameOverMusicClip.start();
             }
         } catch (Exception e) {
@@ -123,19 +113,14 @@ public class SoundManager {
         }).start();
     }
 
-    // بررسی اینکه آیا در حال حاضر موزیک فعال است یا خیر
     public static boolean isMusicEnabled() {
         return isMusicEnabled;
     }
 
-    // متد هوشمند برای قطع و وصل کامل صداها با فشردن یک دکمه
     public static void toggleAllSounds() {
-        if (isMusicEnabled) {
-            // اگر صدا وصل است، همه چیز را صفر (خاموش) کن
+        if (isMusicEnabled)
             updateSettings("0,0,0,0");
-        } else {
-            // اگر صدا قطع است، همه را یک (روشن) کن
+        else
             updateSettings("1,1,1,1");
-        }
     }
 }
