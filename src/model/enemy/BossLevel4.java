@@ -1,64 +1,109 @@
 package model.enemy;
 
 import model.Egg;
-import javax.swing.*;
+
+import javax.swing.ImageIcon;
 import java.awt.*;
 import java.util.ArrayList;
 
 public class BossLevel4 extends Boss {
-    private double angleMovement = 0;
-    private long lastShotTime = 0;
-    private final long shotInterval = 1500;
+
+    private static final int PANEL_WIDTH = 800;
+    private static final int BASE_Y = 50;
+    private static final int VERTICAL_MOVEMENT_RANGE = 25;
+    private static final double ANGLE_STEP = 0.05;
+
+    private static final int EGG_SPEED = 4;
+    private static final long SHOT_INTERVAL = 1500;
+    private static final int[] SHOT_ANGLES = {0, 90, 180, 270};
+
+    private double movementAngle;
+    private long lastShotTime;
 
     public BossLevel4(int x, int y) {
-        // x, y, speedX, speedY, lives, width, height
         super(x, y, 2, 2, 50, 140, 140);
+        bossImage = loadBossImage();
+    }
 
+    private Image loadBossImage() {
         ImageIcon icon = new ImageIcon("icon/boss1.png");
-        Image rawImage = icon.getImage();
 
-        if (rawImage != null) {
-            this.bossImage = rawImage.getScaledInstance(width, height, Image.SCALE_SMOOTH);
+        if (icon.getImageLoadStatus() != MediaTracker.COMPLETE) {
+            return null;
         }
+
+        return icon.getImage().getScaledInstance(width, height, Image.SCALE_SMOOTH);
     }
 
     @Override
     public void update() {
-        x += speedX;
-        if (x < 0 || x > 800 - width) {
+        updateHorizontalPosition();
+        updateVerticalPosition();
+    }
+
+    private void updateHorizontalPosition() {
+        int newX = getX() + speedX;
+
+        if (newX < 0 || newX > PANEL_WIDTH - width) {
             speedX *= -1;
+            newX = getX() + speedX;
         }
 
-        angleMovement += 0.05;
-        y = 50 + (int) (Math.sin(angleMovement) * 25);
+        setPosition(newX, getY());
+    }
+
+    private void updateVerticalPosition() {
+        movementAngle += ANGLE_STEP;
+        int newY = BASE_Y + (int) (Math.sin(movementAngle) * VERTICAL_MOVEMENT_RANGE);
+
+        setPosition(getX(), newY);
     }
 
     @Override
     public void updateAttack(ArrayList<Egg> eggs) {
-        long now = System.currentTimeMillis();
-        if (now - lastShotTime > shotInterval) {
-            int centerX = x + width / 2;
-            int centerY = y + height;
+        long currentTime = System.currentTimeMillis();
 
-            int[] angles = {0, 90, 180, 270};
-            for (int angle : angles) {
-                eggs.add(new Egg(centerX, centerY, 4, angle));
-            }
-            lastShotTime = now;
+        if (currentTime - lastShotTime < SHOT_INTERVAL) {
+            return;
+        }
+
+        shootInFourDirections(eggs);
+        lastShotTime = currentTime;
+    }
+
+    private void shootInFourDirections(ArrayList<Egg> eggs) {
+        int centerX = getX() + width / 2;
+        int centerY = getY() + height;
+
+        for (int angle : SHOT_ANGLES) {
+            eggs.add(new Egg(centerX, centerY, EGG_SPEED, angle));
         }
     }
 
     @Override
     public void draw(Graphics2D g2d) {
-        if (bossImage != null && bossImage.getWidth(null) > 0) {
-            g2d.drawImage(bossImage, x, y, null);
-        } else {
-            g2d.setColor(Color.DARK_GRAY);
-            g2d.fillRect(x, y, width, height);
-            g2d.setColor(Color.RED);
-            g2d.drawRect(x, y, width, height);
-            g2d.drawString("Image Not Found!", x + 20, y + height / 2);
-        }
+        int x = getX();
+        int y = getY();
+
+        drawBoss(g2d, x, y);
         drawHealthBar(g2d);
+    }
+
+    private void drawBoss(Graphics2D g2d, int x, int y) {
+        if (bossImage != null) {
+            g2d.drawImage(bossImage, x, y, null);
+            return;
+        }
+
+        drawFallbackBoss(g2d, x, y);
+    }
+
+    private void drawFallbackBoss(Graphics2D g2d, int x, int y) {
+        g2d.setColor(Color.DARK_GRAY);
+        g2d.fillRect(x, y, width, height);
+
+        g2d.setColor(Color.RED);
+        g2d.drawRect(x, y, width, height);
+        g2d.drawString("Image Not Found!", x + 20, y + height / 2);
     }
 }

@@ -3,8 +3,12 @@ package model;
 import model.enemy.Enemy;
 
 public class Cell {
-    private int row, col;
-    private int targetX, targetY;
+
+    private final int row;
+    private final int col;
+
+    private int targetX;
+    private int targetY;
     private int cellLives;
     private Enemy currentEnemy;
 
@@ -17,19 +21,23 @@ public class Cell {
     }
 
     public void updatePosition(int offsetX, int offsetY) {
-        this.targetX += offsetX;
-        this.targetY += offsetY;
+        targetX += offsetX;
+        targetY += offsetY;
 
-        if (currentEnemy != null && !currentEnemy.isMovingToTarget) {
-            currentEnemy.x = this.targetX;
-            currentEnemy.y = this.targetY;
+        if (currentEnemy != null && !currentEnemy.isMovingToTarget()) {
+            currentEnemy.setPosition(targetX, targetY);
         }
     }
 
     public int getTargetX() { return targetX; }
+
     public int getTargetY() { return targetY; }
+
     public int getCellLives() { return cellLives; }
-    public void decrementCellLives() { this.cellLives--; }
+
+    public void decrementCellLives() { cellLives--; }
+
     public Enemy getCurrentEnemy() { return currentEnemy; }
+
     public void setCurrentEnemy(Enemy currentEnemy) { this.currentEnemy = currentEnemy; }
 }

@@ -1,39 +1,58 @@
 package model.enemy;
 
-import javax.swing.*;
+import javax.swing.ImageIcon;
 import java.awt.*;
 
 public class ShooterEnemy extends Enemy {
-    private Image enemyImage;
+
+    private static final Font LIVES_FONT = new Font("Arial", Font.BOLD, 12);
+
+    private final Image enemyImage;
 
     public ShooterEnemy(int x, int y, int currentLevel) {
-        super(x, y, 2, 2, (currentLevel >= 7) ? 4 : 3);
+        super(x, y, 2, 2, currentLevel >= 7 ? 4 : 3);
+        enemyImage = loadEnemyImage();
+    }
 
-        ImageIcon icon = new ImageIcon("icon\\shooter_chicken.png");
-        Image rawImage = icon.getImage();
-        if (rawImage != null && icon.getImageLoadStatus() == MediaTracker.COMPLETE) {
-            this.enemyImage = rawImage.getScaledInstance(width, height, Image.SCALE_SMOOTH);
+    private Image loadEnemyImage() {
+        ImageIcon icon = new ImageIcon("icon/shooter_chicken.png");
+
+        if (icon.getImageLoadStatus() != MediaTracker.COMPLETE) {
+            return null;
         }
+
+        return icon.getImage().getScaledInstance(width, height, Image.SCALE_SMOOTH);
     }
 
     @Override
     public void update() {
-        if (isMovingToTarget) {
+        if (isMovingToTarget()) {
             moveTowardsTarget();
         }
     }
 
     @Override
     public void draw(Graphics2D g2d) {
+        int x = getX();
+        int y = getY();
+
+        drawEnemy(g2d, x, y);
+        drawLives(g2d, x, y);
+    }
+
+    private void drawEnemy(Graphics2D g2d, int x, int y) {
         if (enemyImage != null) {
             g2d.drawImage(enemyImage, x, y, null);
-        } else {
-            g2d.setColor(Color.RED);
-            g2d.fillOval(x, y, width, height);
+            return;
         }
 
+        g2d.setColor(Color.RED);
+        g2d.fillOval(x, y, width, height);
+    }
+
+    private void drawLives(Graphics2D g2d, int x, int y) {
         g2d.setColor(Color.WHITE);
-        g2d.setFont(new Font("Arial", Font.BOLD, 12));
-        g2d.drawString(String.valueOf(lives), x + width/2 - 4, y - 5);
+        g2d.setFont(LIVES_FONT);
+        g2d.drawString(String.valueOf(getLives()), x + width / 2 - 4, y - 5);
     }
 }

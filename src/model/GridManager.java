@@ -42,7 +42,7 @@ public class GridManager {
     private Boss currentBoss;
 
     public GridManager(int level, ArrayList<Enemy> activeEnemies, ArrayList<Egg> eggs) {
-        this.currentLevel = level;
+        currentLevel = level;
         this.activeEnemies = activeEnemies;
         this.eggs = eggs;
 
@@ -82,8 +82,7 @@ public class GridManager {
         }
     }
 
-    private void configureLevel(double horizontalSpeed, int verticalStep, long eggDropInterval,
-                                int initialCellLives) {
+    private void configureLevel(double horizontalSpeed, int verticalStep, long eggDropInterval, int initialCellLives) {
         this.horizontalSpeed = horizontalSpeed;
         this.verticalStep = verticalStep;
         this.eggDropInterval = eggDropInterval;
@@ -93,13 +92,13 @@ public class GridManager {
     private void setupLevel() {
         activeEnemies.clear();
         currentBoss = null;
+        lastEggDropTime = System.currentTimeMillis();
 
         if (isBossLevel()) {
             setupBossLevel();
-            return;
+        } else {
+            setupNormalLevel();
         }
-
-        setupNormalLevel();
     }
 
     private void setupBossLevel() {
@@ -142,21 +141,25 @@ public class GridManager {
                 if (randomValue > 0.6) {
                     return new FastEnemy(x, y, currentLevel);
                 }
+
                 return new NormalEnemy(x, y, currentLevel);
             case 3:
                 if (randomValue > 0.5) {
                     return new ZigzagEnemy(x, y, currentLevel);
                 }
+
                 return new NormalEnemy(x, y, currentLevel);
             case 5:
                 if (randomValue > 0.5) {
                     return new ShooterEnemy(x, y, currentLevel);
                 }
+
                 return new FastEnemy(x, y, currentLevel);
             case 6:
                 if (randomValue > 0.5) {
                     return new ZigzagEnemy(x, y, currentLevel);
                 }
+
                 return new ShooterEnemy(x, y, currentLevel);
             case 7:
                 return createLevelSevenEnemy(x, y, randomValue);
@@ -182,6 +185,8 @@ public class GridManager {
     }
 
     public void update() {
+        removeInactiveEnemies();
+
         if (activeEnemies.isEmpty()) {
             advanceLevel();
             return;
@@ -195,6 +200,10 @@ public class GridManager {
         updateGridMovement();
         resetGridIfItReachedBottom();
         updateEggDropping();
+    }
+
+    private void removeInactiveEnemies() {
+        activeEnemies.removeIf(enemy -> !enemy.isActive());
     }
 
     private void updateBoss() {
@@ -256,7 +265,7 @@ public class GridManager {
         }
 
         resetGridPosition();
-        System.out.println("⚠️ Warning: Chickens invaded the bottom! Grid reset to top.");
+        System.out.println("Warning: Chickens reached the bottom. Grid reset to top.");
     }
 
     private boolean hasGridReachedBottom() {
@@ -310,18 +319,13 @@ public class GridManager {
             return;
         }
 
-        enemy.x = newX;
-        enemy.y = newY;
-
-        if (enemy.isMovingToTarget) {
-            enemy.setTargetPosition(newX, newY);
-        }
+        enemy.setPosition(newX, newY);
     }
 
     private void updateEggDropping() {
         long currentTime = System.currentTimeMillis();
 
-        if (currentTime - lastEggDropTime <= eggDropInterval) {
+        if (currentTime - lastEggDropTime < eggDropInterval) {
             return;
         }
 
@@ -348,7 +352,7 @@ public class GridManager {
         ArrayList<Enemy> readyEnemies = new ArrayList<>();
 
         for (Enemy enemy : activeEnemies) {
-            if (!enemy.isMovingToTarget) {
+            if (enemy.isActive() && !enemy.isMovingToTarget()) {
                 readyEnemies.add(enemy);
             }
         }
@@ -370,6 +374,10 @@ public class GridManager {
     }
 
     public void handleEnemyDeath(Enemy deadEnemy) {
+        if (deadEnemy == null) {
+            return;
+        }
+
         if (isBossLevel()) {
             handleBossDeath(deadEnemy);
             return;
@@ -381,13 +389,17 @@ public class GridManager {
             return;
         }
 
+        activeEnemies.remove(deadEnemy);
         handleCellEnemyDeath(deadEnemyCell);
     }
 
     private void handleBossDeath(Enemy deadEnemy) {
-        if (deadEnemy == currentBoss) {
-            activeEnemies.remove(deadEnemy);
+        if (deadEnemy != currentBoss) {
+            return;
         }
+
+        activeEnemies.remove(deadEnemy);
+        currentBoss = null;
     }
 
     private Cell findCellContaining(Enemy enemy) {
@@ -450,7 +462,6 @@ public class GridManager {
     public void resetToLevel(int level) {
         currentLevel = level;
         direction = 1;
-        lastEggDropTime = 0;
 
         configureLevelParameters();
         setupLevel();
@@ -462,7 +473,5 @@ public class GridManager {
         return currentLevel == MID_BOSS_LEVEL || currentLevel == FINAL_BOSS_LEVEL;
     }
 
-    public int getCurrentLevel() {
-        return currentLevel;
-    }
+    public int getCurrentLevel() { return currentLevel; }
 }
