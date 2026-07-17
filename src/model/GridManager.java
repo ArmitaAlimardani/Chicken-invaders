@@ -1,133 +1,184 @@
 package model;
 
-import model.enemy.Enemy;
-import model.enemy.NormalEnemy;
-import model.enemy.FastEnemy;
-import model.enemy.ZigzagEnemy;
-import model.enemy.ShooterEnemy;
 import model.enemy.Boss;
 import model.enemy.BossLevel4;
 import model.enemy.BossLevel8;
+import model.enemy.Enemy;
+import model.enemy.FastEnemy;
+import model.enemy.NormalEnemy;
+import model.enemy.ShooterEnemy;
+import model.enemy.ZigzagEnemy;
 
-import java.awt.*;
 import java.util.ArrayList;
 
 public class GridManager {
-    private Cell[][] grid = new Cell[5][8];
-    private ArrayList<Enemy> activeEnemies;
-    private ArrayList<Egg> eggs;
-    private int currentLevel;
 
-    private double speedX;
-    private int stepY;
+    private static final int ROW_COUNT = 5;
+    private static final int COLUMN_COUNT = 8;
+
+    private static final int MID_BOSS_LEVEL = 4;
+    private static final int FINAL_BOSS_LEVEL = 8;
+
+    private static final int GRID_START_X = 80;
+    private static final int GRID_START_Y = 50;
+    private static final int HORIZONTAL_GAP = 70;
+    private static final int VERTICAL_GAP = 65;
+
+    private static final int PANEL_WIDTH = 800;
+    private static final int ENEMY_WIDTH = 65;
+    private static final int GRID_BOTTOM_LIMIT = 430;
+
+    private final Cell[][] grid = new Cell[ROW_COUNT][COLUMN_COUNT];
+    private final ArrayList<Enemy> activeEnemies;
+    private final ArrayList<Egg> eggs;
+
+    private int currentLevel;
+    private double horizontalSpeed;
+    private int verticalStep;
     private long eggDropInterval;
     private int initialCellLives;
-
     private int direction = 1;
-    private long lastEggDropTime = 0;
-
-    private Boss currentBoss = null;
+    private long lastEggDropTime;
+    private Boss currentBoss;
 
     public GridManager(int level, ArrayList<Enemy> activeEnemies, ArrayList<Egg> eggs) {
         this.currentLevel = level;
         this.activeEnemies = activeEnemies;
         this.eggs = eggs;
-        initLevelParameters();
-        setupGrid();
+
+        configureLevelParameters();
+        setupLevel();
     }
 
-    private void initLevelParameters() {
+    private void configureLevelParameters() {
         switch (currentLevel) {
             case 1:
-                speedX = 1.0; stepY = 20; eggDropInterval = 3000; initialCellLives = 2;
+                configureLevel(1.0, 20, 3000, 2);
                 break;
             case 2:
-                speedX = 1.5; stepY = 20; eggDropInterval = 2000; initialCellLives = 2;
+                configureLevel(1.5, 20, 2000, 2);
                 break;
             case 3:
-                speedX = 2.0; stepY = 25; eggDropInterval = 1500; initialCellLives = 3;
+                configureLevel(2.0, 25, 1500, 3);
                 break;
             case 4:
-                speedX = 1.5; stepY = 0;  eggDropInterval = 1500; initialCellLives = 1;
+                configureLevel(1.5, 0, 1500, 1);
                 break;
             case 5:
-                speedX = 2.5; stepY = 25; eggDropInterval = 1000; initialCellLives = 3;
+                configureLevel(2.5, 25, 1000, 3);
                 break;
             case 6:
-                speedX = 3.0; stepY = 30; eggDropInterval = 800;  initialCellLives = 4;
+                configureLevel(3.0, 30, 800, 4);
                 break;
             case 7:
-                speedX = 3.5; stepY = 30; eggDropInterval = 700;  initialCellLives = 4;
+                configureLevel(3.5, 30, 700, 4);
                 break;
-            case 8: // غول نهایی
-                speedX = 3.0; stepY = 0;  eggDropInterval = 1000; initialCellLives = 1;
+            case 8:
+                configureLevel(3.0, 0, 1000, 1);
                 break;
             default:
-                speedX = 1.0; stepY = 20; eggDropInterval = 3000; initialCellLives = 2;
+                configureLevel(1.0, 20, 3000, 2);
+                break;
         }
     }
 
-    private void setupGrid() {
+    private void configureLevel(double horizontalSpeed, int verticalStep, long eggDropInterval,
+                                int initialCellLives) {
+        this.horizontalSpeed = horizontalSpeed;
+        this.verticalStep = verticalStep;
+        this.eggDropInterval = eggDropInterval;
+        this.initialCellLives = initialCellLives;
+    }
+
+    private void setupLevel() {
         activeEnemies.clear();
         currentBoss = null;
 
-        if (currentLevel == 4) {
+        if (isBossLevel()) {
+            setupBossLevel();
+            return;
+        }
+
+        setupNormalLevel();
+    }
+
+    private void setupBossLevel() {
+        if (currentLevel == MID_BOSS_LEVEL) {
             currentBoss = new BossLevel4(330, 50);
-            activeEnemies.add(currentBoss);
-            return;
-        }
-        if (currentLevel == 8) {
+        } else {
             currentBoss = new BossLevel8(310, 50);
-            activeEnemies.add(currentBoss);
-            return;
         }
 
-        int startX = 80;
-        int startY = 50;
-        int hGap = 70;
-        int vGap = 65;
+        activeEnemies.add(currentBoss);
+    }
 
-        for (int r = 0; r < 5; r++) {
-            for (int c = 0; c < 8; c++) {
-                int cellX = startX + (c * hGap);
-                int cellY = startY + (r * vGap);
-
-                grid[r][c] = new Cell(r, c, cellX, cellY, initialCellLives);
-
-                Enemy enemy = createEnemyForLevel(cellX, cellY);
-                grid[r][c].setCurrentEnemy(enemy);
-
-                activeEnemies.add(enemy);
+    private void setupNormalLevel() {
+        for (int row = 0; row < ROW_COUNT; row++) {
+            for (int column = 0; column < COLUMN_COUNT; column++) {
+                createGridCell(row, column);
             }
         }
     }
 
+    private void createGridCell(int row, int column) {
+        int cellX = GRID_START_X + column * HORIZONTAL_GAP;
+        int cellY = GRID_START_Y + row * VERTICAL_GAP;
+
+        Cell cell = new Cell(row, column, cellX, cellY, initialCellLives);
+        Enemy enemy = createEnemyForLevel(cellX, cellY);
+
+        cell.setCurrentEnemy(enemy);
+        grid[row][column] = cell;
+        activeEnemies.add(enemy);
+    }
+
     private Enemy createEnemyForLevel(int x, int y) {
-        double rand = Math.random();
+        double randomValue = Math.random();
 
         switch (currentLevel) {
             case 1:
                 return new NormalEnemy(x, y, currentLevel);
             case 2:
-                if (rand > 0.6) return new FastEnemy(x, y, currentLevel);
+                if (randomValue > 0.6) {
+                    return new FastEnemy(x, y, currentLevel);
+                }
                 return new NormalEnemy(x, y, currentLevel);
             case 3:
-                if (rand > 0.5) return new ZigzagEnemy(x, y, currentLevel);
+                if (randomValue > 0.5) {
+                    return new ZigzagEnemy(x, y, currentLevel);
+                }
                 return new NormalEnemy(x, y, currentLevel);
             case 5:
-                if (rand > 0.5) return new ShooterEnemy(x, y, currentLevel);
+                if (randomValue > 0.5) {
+                    return new ShooterEnemy(x, y, currentLevel);
+                }
                 return new FastEnemy(x, y, currentLevel);
             case 6:
-                if (rand > 0.5) return new ZigzagEnemy(x, y, currentLevel);
+                if (randomValue > 0.5) {
+                    return new ZigzagEnemy(x, y, currentLevel);
+                }
                 return new ShooterEnemy(x, y, currentLevel);
             case 7:
-                if (rand < 0.25) return new NormalEnemy(x, y, currentLevel);
-                else if (rand < 0.5) return new FastEnemy(x, y, currentLevel);
-                else if (rand < 0.75) return new ZigzagEnemy(x, y, currentLevel);
-                else return new ShooterEnemy(x, y, currentLevel);
+                return createLevelSevenEnemy(x, y, randomValue);
             default:
                 return new NormalEnemy(x, y, currentLevel);
         }
+    }
+
+    private Enemy createLevelSevenEnemy(int x, int y, double randomValue) {
+        if (randomValue < 0.25) {
+            return new NormalEnemy(x, y, currentLevel);
+        }
+
+        if (randomValue < 0.5) {
+            return new FastEnemy(x, y, currentLevel);
+        }
+
+        if (randomValue < 0.75) {
+            return new ZigzagEnemy(x, y, currentLevel);
+        }
+
+        return new ShooterEnemy(x, y, currentLevel);
     }
 
     public void update() {
@@ -136,169 +187,282 @@ public class GridManager {
             return;
         }
 
-        if (currentLevel == 4 || currentLevel == 8) {
-            if (currentBoss != null && currentBoss.isActive()) {
-                currentBoss.update();
-                currentBoss.updateAttack(eggs);
-            }
+        if (isBossLevel()) {
+            updateBoss();
             return;
         }
 
-        boolean hitEdge = false;
-        int currentShift = (int)(speedX * direction);
+        updateGridMovement();
+        resetGridIfItReachedBottom();
+        updateEggDropping();
+    }
 
-        for (int r = 0; r < 5; r++) {
-            for (int c = 0; c < 8; c++) {
-                Cell cell = grid[r][c];
-                if (cell != null && cell.getCellLives() > 0) {
-                    int nextX = cell.getTargetX() + currentShift;
-                    if (nextX < 0 || nextX > 800 - 65) {
-                        hitEdge = true;
-                    }
-                }
-            }
+    private void updateBoss() {
+        if (currentBoss == null || !currentBoss.isActive()) {
+            return;
         }
 
-        if (hitEdge) {
+        currentBoss.update();
+        currentBoss.updateAttack(eggs);
+    }
+
+    private void updateGridMovement() {
+        int horizontalShift = (int) (horizontalSpeed * direction);
+
+        if (willGridHitHorizontalEdge(horizontalShift)) {
             direction *= -1;
-            for (int r = 0; r < 5; r++) {
-                for (int c = 0; c < 8; c++) {
-                    if (grid[r][c] != null) grid[r][c].updatePosition(0, stepY);
+            moveGrid(0, verticalStep);
+            return;
+        }
+
+        moveGrid(horizontalShift, 0);
+    }
+
+    private boolean willGridHitHorizontalEdge(int horizontalShift) {
+        for (int row = 0; row < ROW_COUNT; row++) {
+            for (int column = 0; column < COLUMN_COUNT; column++) {
+                Cell cell = grid[row][column];
+
+                if (!isCellActive(cell)) {
+                    continue;
                 }
-            }
-        } else {
-            for (int r = 0; r < 5; r++) {
-                for (int c = 0; c < 8; c++) {
-                    if (grid[r][c] != null) grid[r][c].updatePosition(currentShift, 0);
+
+                int nextX = cell.getTargetX() + horizontalShift;
+
+                if (nextX < 0 || nextX > PANEL_WIDTH - ENEMY_WIDTH) {
+                    return true;
                 }
             }
         }
 
-        boolean networkReachedBottom = false;
-        for (int r = 0; r < 5; r++) {
-            for (int c = 0; c < 8; c++) {
-                Cell cell = grid[r][c];
-                if (cell != null && cell.getCellLives() > 0 && cell.getTargetY() > 430) {
-                    networkReachedBottom = true;
-                    break;
+        return false;
+    }
+
+    private void moveGrid(int deltaX, int deltaY) {
+        for (int row = 0; row < ROW_COUNT; row++) {
+            for (int column = 0; column < COLUMN_COUNT; column++) {
+                Cell cell = grid[row][column];
+
+                if (cell != null) {
+                    cell.updatePosition(deltaX, deltaY);
+                }
+            }
+        }
+    }
+
+    private void resetGridIfItReachedBottom() {
+        if (!hasGridReachedBottom()) {
+            return;
+        }
+
+        resetGridPosition();
+        System.out.println("⚠️ Warning: Chickens invaded the bottom! Grid reset to top.");
+    }
+
+    private boolean hasGridReachedBottom() {
+        for (int row = 0; row < ROW_COUNT; row++) {
+            for (int column = 0; column < COLUMN_COUNT; column++) {
+                Cell cell = grid[row][column];
+
+                if (isCellActive(cell) && cell.getTargetY() > GRID_BOTTOM_LIMIT) {
+                    return true;
                 }
             }
         }
 
-        if (networkReachedBottom) {
-            int startX = 80;
-            int startY = 50;
-            int hGap = 70;
-            int vGap = 65;
-            direction = 1;
+        return false;
+    }
 
-            for (int r = 0; r < 5; r++) {
-                for (int c = 0; c < 8; c++) {
-                    Cell cell = grid[r][c];
-                    if (cell != null) {
-                        int targetNewX = startX + (c * hGap);
-                        int targetNewY = startY + (r * vGap);
+    private boolean isCellActive(Cell cell) {
+        return cell != null && cell.getCellLives() > 0;
+    }
 
-                        int diffX = targetNewX - cell.getTargetX();
-                        int diffY = targetNewY - cell.getTargetY();
+    private void resetGridPosition() {
+        direction = 1;
 
-                        cell.updatePosition(diffX, diffY);
+        for (int row = 0; row < ROW_COUNT; row++) {
+            for (int column = 0; column < COLUMN_COUNT; column++) {
+                Cell cell = grid[row][column];
 
-                        Enemy enemy = cell.getCurrentEnemy();
-                        if (enemy != null) {
-                            enemy.x = targetNewX;
-                            enemy.y = targetNewY;
-                            if (enemy.isMovingToTarget) {
-                                enemy.setTargetPosition(targetNewX, targetNewY);
-                            }
-                        }
-                    }
+                if (cell == null) {
+                    continue;
                 }
+
+                resetCellPosition(cell, row, column);
             }
-            System.out.println("⚠️ Warning: Chickens invaded the bottom! Grid reset to top.");
+        }
+    }
+
+    private void resetCellPosition(Cell cell, int row, int column) {
+        int newX = GRID_START_X + column * HORIZONTAL_GAP;
+        int newY = GRID_START_Y + row * VERTICAL_GAP;
+        int deltaX = newX - cell.getTargetX();
+        int deltaY = newY - cell.getTargetY();
+
+        cell.updatePosition(deltaX, deltaY);
+        resetCellEnemyPosition(cell, newX, newY);
+    }
+
+    private void resetCellEnemyPosition(Cell cell, int newX, int newY) {
+        Enemy enemy = cell.getCurrentEnemy();
+
+        if (enemy == null) {
+            return;
         }
 
-        long now = System.currentTimeMillis();
-        if (now - lastEggDropTime > eggDropInterval) {
-            shootEggFromRandomChicken();
-            lastEggDropTime = now;
+        enemy.x = newX;
+        enemy.y = newY;
+
+        if (enemy.isMovingToTarget) {
+            enemy.setTargetPosition(newX, newY);
         }
+    }
+
+    private void updateEggDropping() {
+        long currentTime = System.currentTimeMillis();
+
+        if (currentTime - lastEggDropTime <= eggDropInterval) {
+            return;
+        }
+
+        shootEggFromRandomChicken();
+        lastEggDropTime = currentTime;
     }
 
     private void shootEggFromRandomChicken() {
-        if (activeEnemies.isEmpty()) return;
+        ArrayList<Enemy> readyEnemies = getEnemiesReadyToShoot();
 
-        ArrayList<Enemy> readyToShoot = new ArrayList<>();
-        for (Enemy e : activeEnemies) {
-            if (!e.isMovingToTarget) {
-                readyToShoot.add(e);
-            }
-        }
-
-        if (readyToShoot.isEmpty()) return;
-
-        int index = (int)(Math.random() * readyToShoot.size());
-        Enemy shooter = readyToShoot.get(index);
-
-        eggs.add(new Egg(shooter.getX() + 20, shooter.getY() + 45, 4, 90));
-
-        if (shooter instanceof ShooterEnemy)
-            eggs.add(new Egg(shooter.getX(), shooter.getY() + 20, 5, 0));
-
-    }
-
-    public void handleEnemyDeath(Enemy deadEnemy) {
-        if (currentLevel == 4 || currentLevel == 8) {
-            if (deadEnemy == currentBoss) {
-                activeEnemies.remove(deadEnemy);
-            }
+        if (readyEnemies.isEmpty()) {
             return;
         }
 
-        for (int r = 0; r < 5; r++) {
-            for (int c = 0; c < 8; c++) {
-                Cell cell = grid[r][c];
-                if (cell != null && cell.getCurrentEnemy() == deadEnemy) {
-                    cell.decrementCellLives();
+        Enemy shooter = selectRandomEnemy(readyEnemies);
+        shootNormalEgg(shooter);
 
-                    if (cell.getCellLives() > 0) {
-                        int spawnX = (Math.random() > 0.5) ? 0 : 750;
-                        Enemy replacement = createEnemyForLevel(spawnX, 0);
+        if (shooter instanceof ShooterEnemy) {
+            shootSpecialEgg(shooter);
+        }
+    }
 
-                        replacement.setTargetPosition(cell.getTargetX(), cell.getTargetY());
-                        cell.setCurrentEnemy(replacement);
-                        activeEnemies.add(replacement);
-                    } else {
-                        cell.setCurrentEnemy(null);
-                    }
-                    return;
+    private ArrayList<Enemy> getEnemiesReadyToShoot() {
+        ArrayList<Enemy> readyEnemies = new ArrayList<>();
+
+        for (Enemy enemy : activeEnemies) {
+            if (!enemy.isMovingToTarget) {
+                readyEnemies.add(enemy);
+            }
+        }
+
+        return readyEnemies;
+    }
+
+    private Enemy selectRandomEnemy(ArrayList<Enemy> enemies) {
+        int randomIndex = (int) (Math.random() * enemies.size());
+        return enemies.get(randomIndex);
+    }
+
+    private void shootNormalEgg(Enemy shooter) {
+        eggs.add(new Egg(shooter.getX() + 20, shooter.getY() + 45, 4, 90));
+    }
+
+    private void shootSpecialEgg(Enemy shooter) {
+        eggs.add(new Egg(shooter.getX(), shooter.getY() + 20, 5, 0));
+    }
+
+    public void handleEnemyDeath(Enemy deadEnemy) {
+        if (isBossLevel()) {
+            handleBossDeath(deadEnemy);
+            return;
+        }
+
+        Cell deadEnemyCell = findCellContaining(deadEnemy);
+
+        if (deadEnemyCell == null) {
+            return;
+        }
+
+        handleCellEnemyDeath(deadEnemyCell);
+    }
+
+    private void handleBossDeath(Enemy deadEnemy) {
+        if (deadEnemy == currentBoss) {
+            activeEnemies.remove(deadEnemy);
+        }
+    }
+
+    private Cell findCellContaining(Enemy enemy) {
+        for (int row = 0; row < ROW_COUNT; row++) {
+            for (int column = 0; column < COLUMN_COUNT; column++) {
+                Cell cell = grid[row][column];
+
+                if (cell != null && cell.getCurrentEnemy() == enemy) {
+                    return cell;
                 }
             }
         }
+
+        return null;
+    }
+
+    private void handleCellEnemyDeath(Cell cell) {
+        cell.decrementCellLives();
+
+        if (cell.getCellLives() <= 0) {
+            cell.setCurrentEnemy(null);
+            return;
+        }
+
+        Enemy replacement = createReplacementEnemy(cell);
+        cell.setCurrentEnemy(replacement);
+        activeEnemies.add(replacement);
+    }
+
+    private Enemy createReplacementEnemy(Cell cell) {
+        int spawnX = chooseRandomSpawnX();
+        Enemy replacement = createEnemyForLevel(spawnX, 0);
+
+        replacement.setTargetPosition(cell.getTargetX(), cell.getTargetY());
+
+        return replacement;
+    }
+
+    private int chooseRandomSpawnX() {
+        if (Math.random() > 0.5) {
+            return 0;
+        }
+
+        return 750;
     }
 
     private void advanceLevel() {
-        if (currentLevel < 8) {
-            currentLevel++;
-            initLevelParameters();
-            setupGrid();
-            System.out.println("Advanced to Level " + currentLevel);
-        } else {
+        if (currentLevel >= FINAL_BOSS_LEVEL) {
             System.out.println("Victory! Game Completed.");
+            return;
         }
+
+        currentLevel++;
+        configureLevelParameters();
+        setupLevel();
+
+        System.out.println("Advanced to Level " + currentLevel);
     }
 
     public void resetToLevel(int level) {
-        this.currentLevel = level;
-        this.direction = 1;
-        this.lastEggDropTime = 0;
+        currentLevel = level;
+        direction = 1;
+        lastEggDropTime = 0;
 
-        initLevelParameters();
-
-        setupGrid();
+        configureLevelParameters();
+        setupLevel();
 
         System.out.println("GridManager successfully reset to Level " + level);
     }
 
-    public int getCurrentLevel() { return currentLevel; }
+    private boolean isBossLevel() {
+        return currentLevel == MID_BOSS_LEVEL || currentLevel == FINAL_BOSS_LEVEL;
+    }
+
+    public int getCurrentLevel() {
+        return currentLevel;
+    }
 }
